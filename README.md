@@ -2,172 +2,157 @@
 
 **Ne pozabi follow-upa.**
 
-Preprosta osebna aplikacija za Gmail opomnike.  
-Ustvariš opomnik → ob pravem času dobiš email.
+Osebna lokalna aplikacija za Gmail opomnike.  
+Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 
 ---
 
-## Kaj aplikacija počne?
+## Kaj aplikacija počne
 
 - Ustvari opomnike z naslovom, opisom in datumom
 - Ob nastavljenem času samodejno pošlje email na Gmail
-- Deluje kot PWA – namestljiva na telefon ali namizje
-- Vse je shranjeno lokalno, brez baze podatkov
+- Pametni vnos: prilepi besedilo/mail, Maruša razčleni datum in naslov
+- Ročni vnos: direkten vnos brez parsiranja
+- Deluje kot PWA — namestljiva na telefon ali namizje
+- Vsi podatki so shranjeni lokalno v `data/reminders.json`
+- Brez baze podatkov, brez prijave, brez oblaka
+
+---
+
+## Zahteve
+
+- Node.js (LTS) — [nodejs.org](https://nodejs.org)
+- Gmail račun z App Password
 
 ---
 
 ## Namestitev
 
-### 1. Namesti Node.js
-
-Obiši [nodejs.org](https://nodejs.org) in prenesi LTS verzijo.  
-Po namestitvi preveri v terminalu:
-
 ```bash
-node --version
-```
-
-### 2. Prenesi projekt
-
-```bash
-git clone <url-projekta>
-cd marusa-reminder
 npm install
+cp .env.example .env
+# izpolni .env s svojimi Gmail podatki
+npm start
 ```
 
-### 3. Ustvari Gmail App Password
+Odpri brskalnik: **http://localhost:3001**
+
+---
+
+## Nastavitev Gmail App Password
 
 Gmail App Password je posebno geslo samo za to aplikacijo.  
-**Nikoli ne uporabljaš normalnega Gmail gesla.**
+**Nikoli ne uporabi normalnega Gmail gesla.**
 
-Koraki:
 1. Odpri [myaccount.google.com/security](https://myaccount.google.com/security)
-2. Vklopi **2-stopenjsko preverjanje** (če še ni vklopljeno)
+2. Vklopi **2-stopenjsko preverjanje**
 3. Pojdi na [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-4. Klikni **Ustvari App Password**
-5. Ime: `Marusa Reminder`
-6. Kopiraj generirano geslo (16 znakov)
+4. Ustvari novo geslo — ime: `Marusa Reminder`
+5. Kopiraj generirano geslo (16 znakov)
 
-### 4. Nastavi .env datoteko
-
-```bash
-cp .env.example .env
-```
-
-Odpri `.env` in izpolni:
+### .env datoteka
 
 ```
 GMAIL_USER=tvoj.email@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 MAIL_FROM=tvoj.email@gmail.com
 DEFAULT_REMINDER_EMAIL=tvoj.email@gmail.com
-PORT=3000
+PORT=3001
 ```
 
 ---
 
-## Zagon aplikacije
+## Uporaba
 
-```bash
-npm start
-```
+### Pametni način
 
-Odpri brskalnik na:  
-👉 **http://localhost:3000**
+1. Prilepi besedilo (email, sporočilo, opomba)
+2. Izberi, koliko prej te opomni (preset ali po meri)
+3. Klikni **Razberi opomnik**
+4. Maruša zapolni obrazec — preveri in shrani
+
+Podprti formati datumov:
+- `jutri ob 10`, `v petek`, `naslednji ponedeljek`
+- `12.5.`, `12.5.2026`, `12/5`, `2026-05-12`
+- `12 maja`, `May 12`
+- `čez 3 dni`, `čez teden`, `in 2 days`
+- `čez pol ure`, `čez 30 minut`
+
+Parsiranje je **pravilo-osnovno, brez AI**.
+
+### Ročni način
+
+1. Vnesi naslov, opis, datum in email
+2. Uporabi hitre gumbe: Čez 1 uro / Jutri ob 9 / Čez 3 dni / Naslednji teden
+3. Klikni **Shrani opomnik**
+
+### Offset opomnika
+
+Preset: Ob času dogodka / 1 uro prej / 1 dan prej / 2 dni / 3 dni / 1 teden
+
+Po meri: vnesi število in enoto (minut / ur / dni / tednov)
 
 ---
 
 ## Testiranje emaila
 
-1. Izpolni email polje v aplikaciji
+1. Vnesi email v polje
 2. Klikni **Pošlji testni Gmail**
-3. Preveri svojo Gmail mapo
-
-Če email pride → vse deluje! ✓
+3. Preveri Gmail mapo
 
 ---
 
-## Namestitev kot aplikacija (PWA)
+## Samodejno pošiljanje
 
-### Na telefonu (Android ali iPhone)
-1. Odpri http://localhost:3000 v brskalniku
-2. Tapni meni brskalnika (⋮ ali Share)
-3. Izberi **Dodaj na začetni zaslon**
-4. Potrdi
+Strežnik vsako minuto preveri opomnike.  
+Ko nastopi čas → pošlje email → označi kot poslano.
 
-### Na računalniku (Chrome/Edge)
-1. Odpri http://localhost:3000
-2. V naslovni vrstici klikni ikono namestitve (📥)
-3. Klikni **Namesti**
+**Pomembno:** Opomniki delujejo samo, ko Node.js strežnik teče.  
+Zapri terminal = opomniki se ne pošljejo.
 
 ---
 
-## Kako deluje samodejno pošiljanje?
+## PWA namestitev
 
-Aplikacija vsako minuto preveri opomnike.  
-Ko nastopi čas opomnika → pošlje email → označi kot poslano.
-
-**⚠️ Pomembno:** Email opomniki delujejo samo, ko Node.js strežnik teče.  
-Če zapreš terminal, opomniki ne bodo poslani.
-
-Za zanesljivo delovanje pusti terminal odprt ali zaženi aplikacijo na strežniku.
+**Telefon:** Odpri v brskalniku → meni → Dodaj na začetni zaslon  
+**Računalnik (Chrome/Edge):** Ikona namestitve v naslovni vrstici
 
 ---
 
 ## Struktura projekta
 
 ```
-marusa-reminder/
-  server.js          ← Express strežnik + email logika
-  .env               ← Tvoje Gmail nastavitve (ne commitaj!)
+files/
+  server.js          — Express strežnik + email logika
+  .env               — Gmail nastavitve (ne commitaj!)
+  .env.example       — primer nastavitev
   data/
-    reminders.json   ← Shranjeni opomniki
+    reminders.json   — shranjeni opomniki
   public/
-    index.html       ← Glavna stran
-    style.css        ← Oblikovanje
-    app.js           ← Frontend logika
-    manifest.json    ← PWA konfiguracija
-    service-worker.js← PWA offline podpora
+    index.html       — glavna stran
+    style.css        — oblikovanje
+    app.js           — frontend logika + parser
+    manifest.json    — PWA konfiguracija
+    service-worker.js— PWA offline podpora
 ```
 
 ---
 
-## Pametni vnos iz maila/teksta
+## Odpravljanje težav
 
-Na vrhu aplikacije je kartica **"Prilepi mail ali tekst"**.
-
-1. Prilepi besedilo (email, sporočilo, opombo)
-2. Izberi, koliko prej te opomni
-3. Klikni **Razberi opomnik**
-4. Aplikacija zapolni obrazec — ti ga le pregledaš in shraniš
-
-**Pomembno:** To je preprosto pravilo-osnovno razčlenjevanje, ne AI.  
-Deluje najboljše z jasnimi datumi, kot so:
-
-```
-jutri ob 10
-do petka
-v četrtek ob 14
-15.5.2026
-naslednji ponedeljek
-```
-
-Če datum ni prepoznan, aplikacija sporoči:  
-*"Datuma nisem prepoznal. Prosim izberi datum ročno."*
-
----
-
-## Težave?
-
-**Gmail povezava ne deluje:**
+**Gmail ne deluje:**
 - Preveri App Password v `.env`
 - Preveri da je 2-stopenjsko preverjanje vklopljeno
-- App Password ne sme imeti presledkov (ali pa jih pusti – Gmail jih ignorira)
+- Preveri `GMAIL_USER` in `GMAIL_APP_PASSWORD`
 
 **Opomnik ni bil poslan:**
 - Preveri da strežnik teče (`npm start`)
-- Preveri da je čas opomnika v preteklosti ali sedanjosti
-- Odpri http://localhost:3000 in klikni **Pošlji zdaj**
+- Klikni **Pošlji zdaj** na opomnik
+- Preveri konzolo za napake
+
+**Pametni način ne prepozna datuma:**
+- Parsiranje je pravilo-osnovno — poskusi z jasnejšim formatom
+- Ročno nastavi datum v obrazcu
 
 ---
 

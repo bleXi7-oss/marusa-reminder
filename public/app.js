@@ -3,19 +3,14 @@
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleString('sl-SI', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    weekday: 'short', day: 'numeric', month: 'short',
+    year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 
 function getStatus(reminder) {
   if (reminder.sent) return 'sent';
-  const now = new Date();
-  if (new Date(reminder.remindAt) < now) return 'overdue';
+  if (new Date(reminder.remindAt) < new Date()) return 'overdue';
   return 'waiting';
 }
 
@@ -33,18 +28,26 @@ function showMessage(el, text, type) {
 
 // ── Smart Reminder Parser ─────────────────────────────────────
 
-const GREETING_RE   = /^(zdravo|živjo|hej|hello|hi\b|lep pozdrav|dober dan|dear\b|pozdravljeni)[,!.\s]*/i;
-const SIGNATURE_RE  = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards|kind regards|regards|cheers|hvala in lep pozdrav)[^\n]*/gi;
-const ACTION_WORDS  = ['pokliči','poklic','pošlji','posreduj','preveri','preglej','pripravi','oddaj','pošljite','sestanek','meeting','call','send','submit','check','review','prepare'];
+const GREETING_RE  = /^(zdravo|živjo|hej|hello|hi\b|lep pozdrav|dober dan|dear\b|pozdravljeni)[,!.\s]*/i;
+const SIGNATURE_RE = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards|kind regards|regards|cheers|hvala in lep pozdrav)[^\n]*/gi;
+const ACTION_WORDS = ['pokliči','poklic','pošlji','posreduj','preveri','preglej','pripravi','oddaj','pošljite','sestanek','meeting','call','send','submit','check','review','prepare'];
+
+const BUSINESS_KEYWORDS = [
+  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,            label: 'račun' },
+  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,        label: 'plačilo' },
+  { re: /\bdobavnic|\bdelivery note\b/i,                        label: 'dobavnica' },
+  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,         label: 'ponudba' },
+  { re: /\bnaročiln|\border confirmation\b/i,                  label: 'naročilnica' },
+  { re: /\bddv\b|\bvat\b/i,                                    label: 'DDV' },
+  { re: /\bfollow.?up\b/i,                                     label: 'follow-up' },
+  { re: /\bknjig|\baccounting\b/i,                             label: 'računovodstvo' },
+  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                  label: 'stranka' },
+  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,               label: 'dobavitelj' },
+];
 
 const SL_DAYS = [
-  [/\bponedeljk/i, 1],
-  [/\btorek|\btork/i, 2],
-  [/\bsred/i, 3],
-  [/\bčetr/i, 4],
-  [/\bpetek|\bpetk/i, 5],
-  [/\bsobot/i, 6],
-  [/\bnedelj/i, 0],
+  [/\bponedeljk/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
+  [/\bčetr/i, 4], [/\bpetek|\bpetk/i, 5], [/\bsobot/i, 6], [/\bnedelj/i, 0],
 ];
 
 const EN_DAYS = [
@@ -77,7 +80,6 @@ function getNextWeekday(targetDay, forceNext) {
 function extractTime(text) {
   const lower = text.toLowerCase();
 
-  // am/pm: "10am", "2pm", "10:30pm"
   const ampm = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if (ampm) {
     let h = parseInt(ampm[1], 10);
@@ -87,7 +89,6 @@ function extractTime(text) {
     return { hour: h, minute: min };
   }
 
-  // "ob 10", "ob 10h", "ob 10:30", "ob 10.30", "at 14:30", "@15"
   const ob = text.match(/(?:ob|at|@)\s*(\d{1,2})(?:[.:](\d{2})|h)?\b/i);
   if (ob) {
     const h = parseInt(ob[1], 10);
@@ -95,7 +96,6 @@ function extractTime(text) {
     if (h >= 0 && h <= 23) return { hour: h, minute: min };
   }
 
-  // okoli/okrog + time: "okoli 14", "okrog 10h"
   const okoli = text.match(/(?:okoli|okrog)\s+(\d{1,2})(?:[.:](\d{2}))?\b/i);
   if (okoli) {
     const h = parseInt(okoli[1], 10);
@@ -103,7 +103,6 @@ function extractTime(text) {
     if (h >= 0 && h <= 23) return { hour: h, minute: min };
   }
 
-  // Vague time-of-day
   if (/\beod\b|\bcob\b|konec dneva|do konca dneva/.test(lower)) return { hour: 16, minute: 0 };
   if (/\bopoldne\b|\bnoon\b/.test(lower))                        return { hour: 12, minute: 0 };
   if (/zgodaj zjutraj|early morning/.test(lower))                return { hour:  7, minute: 0 };
@@ -115,19 +114,18 @@ function extractTime(text) {
   return null;
 }
 
-// Returns relative minutes from now for "in X minutes/hours" patterns, or null.
 function extractRelativeMinutes(text) {
   const lower = text.toLowerCase();
-  if (/čez\s+pol\s+ure/.test(lower))          return 30;
+  if (/čez\s+pol\s+ure/.test(lower))         return 30;
   const minM = lower.match(/čez\s+(\d+)\s+minut/);
-  if (minM)                                   return parseInt(minM[1]);
-  if (/čez\s+eno\s+uro/.test(lower))          return 60;
+  if (minM)                                  return parseInt(minM[1]);
+  if (/čez\s+eno\s+uro/.test(lower))         return 60;
   const hrM = lower.match(/čez\s+(\d+)\s+ur[oa]?\b/);
-  if (hrM)                                    return parseInt(hrM[1]) * 60;
+  if (hrM)                                   return parseInt(hrM[1]) * 60;
   const enHr = lower.match(/\bin\s+(\d+)\s+hour/);
-  if (enHr)                                   return parseInt(enHr[1]) * 60;
+  if (enHr)                                  return parseInt(enHr[1]) * 60;
   const enMin = lower.match(/\bin\s+(\d+)\s+minut/);
-  if (enMin)                                  return parseInt(enMin[1]);
+  if (enMin)                                 return parseInt(enMin[1]);
   return null;
 }
 
@@ -142,132 +140,90 @@ function extractDate(text) {
   const weekday  = d => ({ date: d, tier: 'weekday'  });
   const vague    = d => ({ date: d, tier: 'vague'    });
 
-  // ── Unambiguous relative ──────────────────────────────────
-
-  if (/\bdanes\b|\btoday\b/.test(lower))
-    return relative(new Date(today));
+  if (/\bdanes\b|\btoday\b/.test(lower))    return relative(new Date(today));
 
   if (/\bjutri\b|\btomorrow\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d);
   }
-
   if (/\bpojutrišnjem\b|\bday after tomorrow\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d);
   }
 
-  // čez en dan / čez dva / čez tri (word numbers)
-  if (/čez\s+en\s+dan/.test(lower)) {
-    const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d);
-  }
-  if (/čez\s+dva\s+dn/.test(lower)) {
-    const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d);
-  }
-  if (/čez\s+tri\s+dn/.test(lower)) {
-    const d = new Date(today); d.setDate(d.getDate() + 3); return relative(d);
-  }
+  if (/čez\s+en\s+dan/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
+  if (/čez\s+dva\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d); }
+  if (/čez\s+tri\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 3); return relative(d); }
 
-  // čez X dni (numeric)
   const cezDni = lower.match(/čez\s+(\d+)\s+dn/);
-  if (cezDni) {
-    const d = new Date(today); d.setDate(d.getDate() + parseInt(cezDni[1])); return relative(d);
-  }
+  if (cezDni) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezDni[1])); return relative(d); }
 
-  // čez X tednov / čez en teden / čez teden
   const cezTed = lower.match(/čez\s+(\d+)\s+ted/);
-  if (cezTed) {
-    const d = new Date(today); d.setDate(d.getDate() + parseInt(cezTed[1]) * 7); return relative(d);
-  }
-  if (/čez\s+en\s+ted|čez\s+ted/.test(lower)) {
-    const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d);
-  }
+  if (cezTed) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezTed[1]) * 7); return relative(d); }
+  if (/čez\s+en\s+ted|čez\s+ted/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
 
-  // English: in X days / in X weeks
   const inDays = lower.match(/\bin\s+(\d+)\s+day/);
-  if (inDays) {
-    const d = new Date(today); d.setDate(d.getDate() + parseInt(inDays[1])); return relative(d);
-  }
+  if (inDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inDays[1])); return relative(d); }
   const inWeeks = lower.match(/\bin\s+(\d+)\s+week/);
-  if (inWeeks) {
-    const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d);
-  }
+  if (inWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d); }
 
-  // ── Explicit numeric date formats ─────────────────────────
-
-  // YYYY/MM/DD
+  // Explicit numeric formats (ordered: longest/most specific first)
   const yyyySlash = text.match(/\b(\d{4})\/(\d{2})\/(\d{2})\b/);
-  if (yyyySlash) return exact(new Date(+yyyySlash[1], +yyyySlash[2] - 1, +yyyySlash[3]));
+  if (yyyySlash) return exact(new Date(+yyyySlash[1], +yyyySlash[2]-1, +yyyySlash[3]));
 
-  // YYYY-MM-DD (ISO) — before DD-MM-YYYY to avoid partial match
   const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-  if (iso) return exact(new Date(+iso[1], +iso[2] - 1, +iso[3]));
+  if (iso) return exact(new Date(+iso[1], +iso[2]-1, +iso[3]));
 
-  // DD-MM-YYYY (European dash, 4-digit year)
   const dmyDash = text.match(/\b(\d{1,2})-(\d{2})-(\d{4})\b/);
-  if (dmyDash) return exact(new Date(+dmyDash[3], +dmyDash[2] - 1, +dmyDash[1]));
+  if (dmyDash) return exact(new Date(+dmyDash[3], +dmyDash[2]-1, +dmyDash[1]));
 
-  // DD.MM.YYYY
   const dmyFull = text.match(/\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b/);
-  if (dmyFull) return exact(new Date(+dmyFull[3], +dmyFull[2] - 1, +dmyFull[1]));
+  if (dmyFull) return exact(new Date(+dmyFull[3], +dmyFull[2]-1, +dmyFull[1]));
 
-  // DD/MM/YYYY
   const slashFull = text.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
-  if (slashFull) return exact(new Date(+slashFull[3], +slashFull[2] - 1, +slashFull[1]));
+  if (slashFull) return exact(new Date(+slashFull[3], +slashFull[2]-1, +slashFull[1]));
 
-  // DD.MM or DD.MM. (no year)
   const dmyShort = text.match(/\b(\d{1,2})\.(\d{1,2})\.?(?!\d)/);
   if (dmyShort) {
-    const d = new Date(today.getFullYear(), +dmyShort[2] - 1, +dmyShort[1]);
+    const d = new Date(today.getFullYear(), +dmyShort[2]-1, +dmyShort[1]);
     if (d < today) d.setFullYear(d.getFullYear() + 1);
     return exact(d);
   }
 
-  // DD/MM (no year)
   const slashShort = text.match(/\b(\d{1,2})\/(\d{1,2})\b(?!\/\d)/);
   if (slashShort && +slashShort[1] <= 31 && +slashShort[2] <= 12) {
-    const d = new Date(today.getFullYear(), +slashShort[2] - 1, +slashShort[1]);
+    const d = new Date(today.getFullYear(), +slashShort[2]-1, +slashShort[1]);
     if (d < today) d.setFullYear(d.getFullYear() + 1);
     return exact(d);
   }
 
-  // DD-MM (no year, e.g. "12-5")
   const dmShort = text.match(/\b(\d{1,2})-(\d{1,2})\b(?!-)/);
   if (dmShort && +dmShort[1] <= 31 && +dmShort[2] >= 1 && +dmShort[2] <= 12) {
-    const d = new Date(today.getFullYear(), +dmShort[2] - 1, +dmShort[1]);
+    const d = new Date(today.getFullYear(), +dmShort[2]-1, +dmShort[1]);
     if (d < today) d.setFullYear(d.getFullYear() + 1);
     return exact(d);
   }
 
-  // ── Month name formats ────────────────────────────────────
-
-  // Slovenian: "12 maja", "12. maja", "12 maj"
   for (const [stem, mNum] of SL_MONTHS) {
     const m = lower.match(new RegExp(`(\\d{1,2})\\.?\\s+${stem}`, 'i'));
     if (m) {
-      const d = new Date(today.getFullYear(), mNum - 1, +m[1]);
+      const d = new Date(today.getFullYear(), mNum-1, +m[1]);
       if (d < today) d.setFullYear(d.getFullYear() + 1);
       return exact(d);
     }
   }
 
-  // English: "May 15" or "15 May"
   for (const [mName, mNum] of Object.entries(EN_MONTHS)) {
     const m1 = text.match(new RegExp(`\\b${mName}\\s+(\\d{1,2})\\b`, 'i'));
     const m2 = text.match(new RegExp(`\\b(\\d{1,2})\\s+${mName}\\b`, 'i'));
     const day = m1 ? +m1[1] : (m2 ? +m2[1] : null);
     if (day) {
-      const d = new Date(today.getFullYear(), mNum - 1, day);
+      const d = new Date(today.getFullYear(), mNum-1, day);
       if (d < today) d.setFullYear(d.getFullYear() + 1);
       return exact(d);
     }
   }
 
-  // ── Weekday / vague phrases ───────────────────────────────
-
-  // naslednji teden / drug teden / next week → next Monday
   if (/naslednji teden|drug teden|next week/.test(lower))
     return vague(getNextWeekday(1, true));
-
-  // do konca tedna / konec tedna → this Friday
   if (/do konca tedna|konec tedna|end of (this )?week/.test(lower))
     return vague(getNextWeekday(5, false));
 
@@ -279,7 +235,6 @@ function extractDate(text) {
     if (re.test(lower)) return weekday(getNextWeekday(dayNum, /\bnext\b/.test(lower)));
   }
 
-  // konec dneva / EOD / COB → today
   if (/konec dneva|do konca dneva|\beod\b|\bcob\b/.test(lower))
     return relative(new Date(today));
 
@@ -300,21 +255,43 @@ function countDateSignals(text) {
   return n;
 }
 
-function extractTitle(text) {
+function detectBusinessContext(text) {
+  for (const { re, label } of BUSINESS_KEYWORDS) {
+    if (re.test(text)) return label;
+  }
+  return null;
+}
+
+function extractTitle(text, businessContext) {
   const cleaned = text.replace(SIGNATURE_RE, '').trim();
 
   const subj = cleaned.match(/^(?:subject|zadeva):\s*(.+)/im);
   if (subj) return subj[1].trim().slice(0, 80);
 
+  const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lep pozdrav|lp\b|dear\b)/i;
   const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
   for (const line of lines) {
     const noGreeting = line.replace(GREETING_RE, '').trim();
     if (noGreeting.length < 4) continue;
+    if (SKIP_RE.test(noGreeting)) continue;
     const lc = noGreeting.toLowerCase();
     if (ACTION_WORDS.some(w => lc.startsWith(w))) return noGreeting.slice(0, 80);
     return noGreeting.slice(0, 80);
   }
+
+  if (businessContext) return `Preveri ${businessContext}`;
   return cleaned.slice(0, 80).trim();
+}
+
+function extractDescription(text) {
+  const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lp\b|lep pozdrav|dear\b|s spoštovanjem)/i;
+  const cleaned = text.replace(SIGNATURE_RE, '').trim();
+  const lines = cleaned.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length >= 8)
+    .filter(l => !SKIP_RE.test(l))
+    .filter(l => !/^(?:subject|zadeva):/i.test(l));
+  return lines.slice(0, 2).join(' ').replace(/\s+/g, ' ').slice(0, 140).trim();
 }
 
 function applyReminderOffset(date, offset) {
@@ -330,34 +307,35 @@ function applyReminderOffset(date, offset) {
 function applyCustomReminderOffset(eventDate, amount, unit) {
   const d = new Date(eventDate);
   const n = parseInt(amount, 10);
-  if (unit === 'minut')                                   d.setMinutes(d.getMinutes() - n);
-  else if (unit === 'ura' || unit === 'uri' || unit === 'ur') d.setHours(d.getHours() - n);
-  else if (unit === 'dan' || unit === 'dni')               d.setDate(d.getDate() - n);
+  if (unit === 'minut')                                             d.setMinutes(d.getMinutes() - n);
+  else if (unit === 'ura' || unit === 'uri' || unit === 'ur')      d.setHours(d.getHours() - n);
+  else if (unit === 'dan' || unit === 'dni')                       d.setDate(d.getDate() - n);
   else if (unit === 'teden' || unit === 'tedna' || unit === 'tednov') d.setDate(d.getDate() - n * 7);
   return d;
 }
 
 function parseSmartReminderText(text, offset) {
-  const title       = extractTitle(text);
-  const description = text.slice(0, 500).trim();
+  const businessContext = detectBusinessContext(text);
+  const title           = extractTitle(text, businessContext);
+  const description     = extractDescription(text);
 
-  // "čez pol ure", "čez 30 minut", "in 2 hours" — compute absolute time directly
+  // "čez pol ure", "čez 30 minut", "in 2 hours" — absolute time, skip offset
   const relMins = extractRelativeMinutes(text);
   if (relMins !== null) {
     const now = new Date();
     now.setSeconds(0, 0);
     now.setMinutes(now.getMinutes() + relMins);
-    return { title, remindAt: now, description, confidence: 'high', warning: null };
+    return { title, remindAt: now, description, confidence: 'high', warning: null, businessContext };
   }
 
   const { date: eventDate, tier } = extractDate(text);
-  const timeResult  = extractTime(text);
-  const multiDate   = countDateSignals(text) >= 2;
-  const urgent      = detectUrgency(text);
+  const timeResult = extractTime(text);
+  const multiDate  = countDateSignals(text) >= 2;
+  const urgent     = detectUrgency(text);
 
   if (!eventDate) {
     return {
-      title, remindAt: null, description, confidence: 'none',
+      title, remindAt: null, description, confidence: 'none', businessContext,
       warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
     };
   }
@@ -368,16 +346,15 @@ function parseSmartReminderText(text, offset) {
     0, 0
   );
 
-  // Three-tier confidence
   let confidence;
-  if      (tier === 'exact' && timeResult)                      confidence = 'high';
-  else if (tier === 'exact' || tier === 'relative')             confidence = 'medium';
-  else if (tier === 'weekday')                                  confidence = 'medium';
-  else                                                          confidence = 'low';
+  if      (tier === 'exact' && timeResult)           confidence = 'high';
+  else if (tier === 'exact' || tier === 'relative')  confidence = 'medium';
+  else if (tier === 'weekday')                       confidence = 'medium';
+  else                                               confidence = 'low';
 
   const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
 
-  return { title, remindAt: applyReminderOffset(eventDate, offset), description, confidence, warning };
+  return { title, remindAt: applyReminderOffset(eventDate, offset), description, confidence, warning, businessContext };
 }
 
 function toDatetimeLocalValue(date) {
@@ -485,12 +462,12 @@ async function deleteReminder(id, btn) {
 // ── Form ──────────────────────────────────────────────────────
 
 document.getElementById('saveBtn').addEventListener('click', async () => {
-  const title        = document.getElementById('title').value.trim();
-  const desc         = document.getElementById('description').value.trim();
-  const localVal     = document.getElementById('remindAt').value;
-  const remindAt     = localVal ? new Date(localVal).toISOString() : '';
-  const email        = document.getElementById('email').value.trim();
-  const msg       = document.getElementById('formMessage');
+  const title    = document.getElementById('title').value.trim();
+  const desc     = document.getElementById('description').value.trim();
+  const localVal = document.getElementById('remindAt').value;
+  const remindAt = localVal ? new Date(localVal).toISOString() : '';
+  const email    = document.getElementById('email').value.trim();
+  const msg      = document.getElementById('formMessage');
 
   if (!title || !remindAt || !email) {
     showMessage(msg, 'Prosim izpolni naslov, datum in email.', 'error');
@@ -549,6 +526,49 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
   }
 });
 
+// ── Mode Switch ───────────────────────────────────────────────
+
+const MODE_KEY = 'marusa_mode';
+
+function setMode(mode) {
+  const smartSection  = document.getElementById('smartSection');
+  const manualSection = document.getElementById('manualSection');
+
+  document.getElementById('modeSmartBtn').classList.toggle('active', mode === 'smart');
+  document.getElementById('modeManualBtn').classList.toggle('active', mode === 'manual');
+  localStorage.setItem(MODE_KEY, mode);
+
+  if (mode === 'smart') {
+    smartSection.classList.remove('hidden');
+    manualSection.classList.add('hidden');
+  } else {
+    smartSection.classList.add('hidden');
+    manualSection.classList.remove('hidden');
+  }
+}
+
+function revealManualForm() {
+  const s = document.getElementById('manualSection');
+  if (!s.classList.contains('hidden')) {
+    s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  s.classList.remove('hidden');
+  s.style.opacity = '0';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    s.style.transition = 'opacity 0.22s ease';
+    s.style.opacity = '1';
+    setTimeout(() => {
+      s.style.transition = '';
+      s.style.opacity = '';
+      s.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 240);
+  }));
+}
+
+document.getElementById('modeSmartBtn').addEventListener('click', () => setMode('smart'));
+document.getElementById('modeManualBtn').addEventListener('click', () => setMode('manual'));
+
 // ── Custom Offset Toggle ──────────────────────────────────────
 
 document.getElementById('customOffsetToggle').addEventListener('change', function () {
@@ -557,6 +577,30 @@ document.getElementById('customOffsetToggle').addEventListener('change', functio
 });
 
 // ── Smart Paste ───────────────────────────────────────────────
+
+function showSmartSummary(remindAt, businessContext, confidence) {
+  const el = document.getElementById('smartSummary');
+  el.classList.remove('hidden');
+
+  if (!remindAt || confidence === 'none') {
+    el.textContent = 'Nisem 100% prepričana. Preveri naslov, opis in datum.';
+    el.className = 'smart-summary';
+    return;
+  }
+
+  const dateStr = remindAt.toLocaleString('sl-SI', {
+    day: 'numeric', month: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+
+  const parts = [];
+  if (businessContext) parts.push(`Prepoznano: ${businessContext}`);
+  parts.push(`Opomnik: ${dateStr}`);
+  parts.push('Preveri in shrani.');
+
+  el.textContent = parts.join(' · ');
+  el.className = 'smart-summary ok';
+}
 
 document.getElementById('smartBtn').addEventListener('click', () => {
   const text      = document.getElementById('smartText').value.trim();
@@ -585,29 +629,35 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     result = parseSmartReminderText(text, offset);
   }
 
-  const { title, remindAt, description, confidence, warning } = result;
+  const { title, remindAt, description, confidence, warning, businessContext } = result;
 
   document.getElementById('title').value       = title;
   document.getElementById('description').value = description;
 
+  const remindAtInput = document.getElementById('remindAt');
+
   if (remindAt && confidence !== 'low' && confidence !== 'none') {
-    document.getElementById('remindAt').value = toDatetimeLocalValue(remindAt);
+    remindAtInput.value = toDatetimeLocalValue(remindAt);
+    remindAtInput.style.borderColor = '';
+
     if (remindAt < new Date()) {
       showMessage(msg, 'Izračunan opomnik je v preteklosti. Preveri datum ali offset.', 'error');
     } else if (warning) {
       showMessage(msg, warning, 'error');
-    } else if (confidence === 'high') {
-      showMessage(msg, '✓ Opomnik pripravljen. Preveri in shrani.', 'success');
     } else {
-      showMessage(msg, 'Datum nastavljen — preveri, če je pravi.', 'success');
+      showMessage(msg, 'Opomnik pripravljen 👌', 'success');
     }
   } else {
-    document.getElementById('remindAt').value = '';
+    remindAtInput.value = '';
+    remindAtInput.style.borderColor = 'var(--amber)';
+    setTimeout(() => { remindAtInput.style.borderColor = ''; }, 4000);
+
     const errMsg = warning ? warning : 'Nisem prepričana glede datuma. Prosim izberi datum ročno.';
     showMessage(msg, errMsg, 'error');
   }
 
-  document.querySelector('.form-card + .form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showSmartSummary(remindAt, businessContext, confidence);
+  revealManualForm();
 });
 
 // ── Quick Buttons ─────────────────────────────────────────────
@@ -617,48 +667,31 @@ function setQuickTime(date) {
 }
 
 document.getElementById('quick1h').addEventListener('click', () => {
-  const d = new Date();
-  d.setHours(d.getHours() + 1, d.getMinutes(), 0, 0);
-  setQuickTime(d);
+  const d = new Date(); d.setHours(d.getHours() + 1, d.getMinutes(), 0, 0); setQuickTime(d);
 });
-
 document.getElementById('quickTomorrow9').addEventListener('click', () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  d.setHours(9, 0, 0, 0);
-  setQuickTime(d);
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
-
 document.getElementById('quick3d').addEventListener('click', () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  d.setHours(9, 0, 0, 0);
-  setQuickTime(d);
+  const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
-
 document.getElementById('quickNextWeek').addEventListener('click', () => {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  d.setHours(9, 0, 0, 0);
-  setQuickTime(d);
+  const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
 
 // ── PWA Install ───────────────────────────────────────────────
 
-window.addEventListener('beforeinstallprompt', (e) => {
-  e.preventDefault();
-});
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 
 // ── Init ──────────────────────────────────────────────────────
 
-(function setDefaultTime() {
+(function init() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(9, 0, 0, 0);
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-  document.getElementById('remindAt').value = local;
+  document.getElementById('remindAt').value = toDatetimeLocalValue(d);
+
+  setMode(localStorage.getItem(MODE_KEY) || 'smart');
 })();
 
 if ('serviceWorker' in navigator) {

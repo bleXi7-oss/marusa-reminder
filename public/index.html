@@ -25,10 +25,15 @@
 
     <main>
 
-      <!-- Smart paste card -->
-      <section class="card form-card" style="margin-bottom: 12px;">
-        <h2>Prilepi mail ali tekst</h2>
-        <p class="card-hint">Prilepi sporočilo, mail ali opombo. Maruša bo poskusila razbrati opomnik.</p>
+      <!-- Mode Switch -->
+      <div class="mode-switch">
+        <button class="mode-btn" id="modeSmartBtn">Pametni način</button>
+        <button class="mode-btn" id="modeManualBtn">Ročni način</button>
+      </div>
+
+      <!-- Smart Paste section -->
+      <section id="smartSection" class="card form-card" style="margin-bottom:12px;">
+        <p class="card-hint">Prilepi mail ali sporočilo in Maruša bo poskusila pripraviti opomnik.</p>
 
         <div class="field">
           <label for="smartText">Sporočilo</label>
@@ -71,11 +76,13 @@
           <button id="smartBtn" class="btn-primary">Razberi opomnik</button>
         </div>
 
+        <div id="smartSummary" class="smart-summary hidden"></div>
         <div id="smartMessage" class="message hidden"></div>
       </section>
 
-      <section class="card form-card">
-        <h2>Nov opomnik</h2>
+      <!-- Manual Form -->
+      <section id="manualSection" class="card form-card">
+        <p class="card-hint" id="manualHint">Klasičen ročni vnos opomnika.</p>
 
         <div class="field">
           <label for="title">Naslov</label>

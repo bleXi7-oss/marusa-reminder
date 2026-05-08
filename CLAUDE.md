@@ -7,48 +7,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm install
 cp .env.example .env
-# Fill in .env with Gmail credentials (see below)
+# Fill in .env with Gmail credentials
 npm start
 ```
 
-The app runs at **http://localhost:3000**.
+The app runs at **http://localhost:3001** (PORT set in `.env`).
 
 ### Required `.env` variables
 
 ```
 GMAIL_USER=tvoj.email@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx   # Gmail App Password, NOT your real password
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 MAIL_FROM=tvoj.email@gmail.com
 DEFAULT_REMINDER_EMAIL=tvoj.email@gmail.com
-PORT=3000
+PORT=3001
 ```
 
-Gmail App Password: Google Account → Security → 2-Step Verification → App passwords.
+Never touch or overwrite `.env` — user configures it manually.
 
 ## Architecture
 
-Single-file Express backend (`server.js`) + vanilla JS frontend (`public/`). No database — reminders persist in `data/reminders.json` (auto-created on first run, auto-backed-up on corruption).
+Single-file Express backend (`server.js`) + vanilla JS frontend (`public/`). No database — reminders persist in `data/reminders.json` (auto-created, auto-backed-up on corruption).
 
 **Data flow:**
 - Frontend (`app.js`) ↔ REST API (`server.js`) ↔ `data/reminders.json`
-- Background interval in `server.js` runs every 60 s, sends due reminders via nodemailer → Gmail SMTP
+- Background interval runs every 60s, sends due reminders via nodemailer → Gmail SMTP port 465
 
-**Reminder lifecycle:** `sent: false` (waiting) → time passes → server loop fires `sendReminderEmail()` → `sent: true, sentAt: <ISO>`. The frontend also polls every 60 s to refresh status badges.
+**Reminder lifecycle:** `sent: false` → server loop fires `sendReminderEmail()` → `sent: true, sentAt: ISO`
+
+**Timezone handling:** Frontend sends UTC ISO via `new Date(localVal).toISOString()`. Server compares with `Date.now()`.
+
+## Frontend modes
+
+Two modes toggled by `.mode-switch` buttons, persisted in `localStorage('marusa_mode')`:
+
+- **Pametni način** (`#smartSection`): Smart Paste parser fills the manual form after parsing
+- **Ročni način** (`#manualSection`): Direct form entry, always visible
+
+After a successful smart parse, `revealManualForm()` shows `#manualSection` with a fade animation and scrolls to it.
+
+## Smart Paste parser (`public/app.js`)
+
+Rule-based only — no AI, no external APIs.
+
+Key functions:
+- `extractTime(text)` → `{ hour, minute }` or null
+- `extractDate(text)` → `{ date, tier }` where tier = `'exact'|'relative'|'weekday'|'vague'`
+- `extractRelativeMinutes(text)` → minutes from now (for "čez pol ure", "in 2 hours"), or null
+- `detectBusinessContext(text)` → label string (račun, plačilo, ponudba...) or null
+- `extractTitle(text, businessContext)` → clean title, max 80 chars
+- `extractDescription(text)` → clean summary, max 140 chars
+- `parseSmartReminderText(text, offset)` → `{ title, remindAt, description, confidence, warning, businessContext }`
+
+**Confidence tiers:**
+- `high` = exact date + specific time → green, prefill form
+- `medium` = exact date or relative/weekday → green, prefill form, note to verify
+- `low` = vague (naslednji teden) → don't prefill date, show amber border on date field
+- `none` = no date found → same as low
+
+**Three-tier offset system:**
+- `applyReminderOffset(date, presetString)` — handles '0','1h','1d','2d','3d','1w'
+- `applyCustomReminderOffset(date, amount, unit)` — handles minut/ur/dni/tednov variants
 
 ## API endpoints
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/api/reminders` | List all reminders |
-| POST | `/api/reminders` | Create reminder (`{title, description?, remindAt, email}`) |
-| DELETE | `/api/reminders/:id` | Delete reminder |
-| POST | `/api/reminders/:id/send-now` | Force-send immediately |
-| POST | `/api/test-email` | Send a test email (`{email?}`) |
+| GET | `/api/reminders` | List all |
+| POST | `/api/reminders` | Create (`{title, description?, remindAt, email}`) |
+| DELETE | `/api/reminders/:id` | Delete |
+| POST | `/api/reminders/:id/send-now` | Force-send |
+| POST | `/api/test-email` | Test Gmail (`{email?}`) |
 
 ## PWA
 
-The app is installable as a PWA. `public/manifest.json` and `public/service-worker.js` handle this. The service worker is registered in `app.js` at startup.
+`public/manifest.json` + `public/service-worker.js`. Registered in `app.js` init.
 
-## Language note
+## Language
 
-The UI, comments, and console messages are in Slovenian. Keep new user-visible strings in Slovenian.
+UI, user-visible strings, and console messages are in Slovenian. Keep new strings in Slovenian.
+
+## Key constraints
+
+- No frameworks, no React/Vue, no database, no auth
+- No AI APIs — parser is rule-based regex only
+- `.env` is never committed (in `.gitignore`)
+- `data/` is never committed (runtime data)
+- Keep code beginner-friendly and minimal
