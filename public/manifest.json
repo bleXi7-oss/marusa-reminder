@@ -1,0 +1,10 @@
+{
+  "name": "Maruša Reminder",
+  "short_name": "Maruša",
+  "description": "Ne pozabi follow-upa.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9f5f0",
+  "theme_color": "#f9f5f0",
+  "icons": []
+}

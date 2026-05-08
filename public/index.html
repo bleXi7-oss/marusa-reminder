@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maruša Reminder</title>
+  <meta name="description" content="Ne pozabi follow-upa." />
+  <meta name="theme-color" content="#f9f5f0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Maruša" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <div class="app">
+
+    <header>
+      <h1>🌸 Maruša Reminder</h1>
+      <p class="subtitle">Ne pozabi follow-upa.</p>
+    </header>
+
+    <main>
+
+      <!-- Smart paste card -->
+      <section class="card form-card" style="margin-bottom: 12px;">
+        <h2>Prilepi mail ali tekst</h2>
+        <p class="card-hint">Prilepi sporočilo, mail ali opombo. Maruša bo poskusila razbrati opomnik.</p>
+
+        <div class="field">
+          <label for="smartText">Sporočilo</label>
+          <textarea id="smartText" rows="4" placeholder="Primer: Prosim pošlji mi feedback do petka ob 10..."></textarea>
+        </div>
+
+        <div class="field">
+          <label>Opomni me</label>
+          <div class="offset-row">
+            <select id="smartOffset">
+              <option value="0">Ob času dogodka</option>
+              <option value="1h">1 uro prej</option>
+              <option value="1d" selected>1 dan prej</option>
+              <option value="2d">2 dni prej</option>
+              <option value="3d">3 dni prej</option>
+              <option value="1w">1 teden prej</option>
+            </select>
+            <label class="custom-toggle">
+              <input type="checkbox" id="customOffsetToggle" />
+              Po meri
+            </label>
+          </div>
+          <div id="customOffsetFields" class="custom-offset-fields hidden">
+            <input type="number" id="customOffsetAmount" min="1" max="365" value="1" />
+            <select id="customOffsetUnit">
+              <option value="minut">minut</option>
+              <option value="ura">ura</option>
+              <option value="uri">uri</option>
+              <option value="ur">ur</option>
+              <option value="dan">dan</option>
+              <option value="dni">dni</option>
+              <option value="teden">teden</option>
+              <option value="tedna">tedna</option>
+              <option value="tednov">tednov</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button id="smartBtn" class="btn-primary">Razberi opomnik</button>
+        </div>
+
+        <div id="smartMessage" class="message hidden"></div>
+      </section>
+
+      <section class="card form-card">
+        <h2>Nov opomnik</h2>
+
+        <div class="field">
+          <label for="title">Naslov</label>
+          <input type="text" id="title" placeholder="npr. Pokliči Erika" autocomplete="off" />
+        </div>
+
+        <div class="field">
+          <label for="description">Opis <span class="optional">(neobvezno)</span></label>
+          <textarea id="description" rows="2" placeholder="npr. Vprašaj glede dokumentacije"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="remindAt">Datum in ura</label>
+          <input type="datetime-local" id="remindAt" />
+          <div class="quick-btns">
+            <button type="button" class="btn-quick" id="quick1h">Čez 1 uro</button>
+            <button type="button" class="btn-quick" id="quickTomorrow9">Jutri ob 9</button>
+            <button type="button" class="btn-quick" id="quick3d">Čez 3 dni</button>
+            <button type="button" class="btn-quick" id="quickNextWeek">Naslednji teden</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="email">Email za opomnik</label>
+          <input type="email" id="email" placeholder="tvoj@gmail.com" />
+        </div>
+
+        <div class="form-actions">
+          <button id="saveBtn" class="btn-primary">Shrani opomnik</button>
+          <button id="testEmailBtn" class="btn-secondary">Pošlji testni Gmail</button>
+        </div>
+
+        <div id="formMessage" class="message hidden"></div>
+      </section>
+
+      <section id="upcomingSection">
+        <h2 class="section-title">Prihajajoči opomniki</h2>
+        <div id="upcomingList"></div>
+      </section>
+
+      <section id="sentSection">
+        <h2 class="section-title">Poslani opomniki</h2>
+        <div id="sentList"></div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
