@@ -451,6 +451,16 @@ input[type="checkbox"] {
 
 .preview-mode .quick-btns { display: none; }
 
+/* ── Email Status ──────────────────────────────────────────── */
+.email-status {
+  display: block;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  color: var(--muted);
+}
+
+.email-status.saved { color: var(--green); }
+
 /* ── Empty State ───────────────────────────────────────────── */
 .empty {
   text-align: center;

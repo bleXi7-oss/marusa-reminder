@@ -704,6 +704,19 @@ document.getElementById('quickNextWeek').addEventListener('click', () => {
 
 const EMAIL_KEY = 'marusa_email';
 
+function updateEmailStatus() {
+  const el      = document.getElementById('emailStatus');
+  const saved   = localStorage.getItem(EMAIL_KEY);
+  const checked = document.getElementById('rememberEmail').checked;
+  if (checked && saved) {
+    el.textContent = 'Email je shranjen ✓';
+    el.className   = 'email-status saved';
+  } else {
+    el.textContent = 'Email se uporabi za opomnike.';
+    el.className   = 'email-status';
+  }
+}
+
 document.getElementById('rememberEmail').addEventListener('change', function () {
   if (this.checked) {
     const e = document.getElementById('email').value.trim();
@@ -711,12 +724,14 @@ document.getElementById('rememberEmail').addEventListener('change', function () 
   } else {
     localStorage.removeItem(EMAIL_KEY);
   }
+  updateEmailStatus();
 });
 
 document.getElementById('email').addEventListener('input', function () {
   if (document.getElementById('rememberEmail').checked && this.value.trim()) {
     localStorage.setItem(EMAIL_KEY, this.value.trim());
   }
+  updateEmailStatus();
 });
 
 // ── PWA Install ───────────────────────────────────────────────
@@ -738,6 +753,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
     document.getElementById('email').value = savedEmail;
     document.getElementById('rememberEmail').checked = true;
   }
+  updateEmailStatus();
 
   // Restore last mode
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
