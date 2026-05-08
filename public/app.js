@@ -23,7 +23,7 @@ function statusLabel(status) {
 function showMessage(el, text, type) {
   el.textContent = text;
   el.className = `message ${type}`;
-  setTimeout(() => { el.className = 'message hidden'; }, 4000);
+  setTimeout(() => { el.className = 'message hidden'; }, 4500);
 }
 
 // ── Smart Reminder Parser ─────────────────────────────────────
@@ -33,34 +33,31 @@ const SIGNATURE_RE = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards
 const ACTION_WORDS = ['pokliči','poklic','pošlji','posreduj','preveri','preglej','pripravi','oddaj','pošljite','sestanek','meeting','call','send','submit','check','review','prepare'];
 
 const BUSINESS_KEYWORDS = [
-  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,            label: 'račun' },
-  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,        label: 'plačilo' },
-  { re: /\bdobavnic|\bdelivery note\b/i,                        label: 'dobavnica' },
-  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,         label: 'ponudba' },
-  { re: /\bnaročiln|\border confirmation\b/i,                  label: 'naročilnica' },
-  { re: /\bddv\b|\bvat\b/i,                                    label: 'DDV' },
-  { re: /\bfollow.?up\b/i,                                     label: 'follow-up' },
-  { re: /\bknjig|\baccounting\b/i,                             label: 'računovodstvo' },
-  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                  label: 'stranka' },
-  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,               label: 'dobavitelj' },
+  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,           label: 'račun' },
+  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,       label: 'plačilo' },
+  { re: /\bdobavnic|\bdelivery note\b/i,                       label: 'dobavnica' },
+  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,        label: 'ponudba' },
+  { re: /\bnaročiln|\border confirmation\b/i,                 label: 'naročilnica' },
+  { re: /\bddv\b|\bvat\b/i,                                   label: 'DDV' },
+  { re: /\bfollow.?up\b/i,                                    label: 'follow-up' },
+  { re: /\bknjig|\baccounting\b/i,                            label: 'računovodstvo' },
+  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                 label: 'stranka' },
+  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,              label: 'dobavitelj' },
 ];
 
 const SL_DAYS = [
   [/\bponedeljk/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
   [/\bčetr/i, 4], [/\bpetek|\bpetk/i, 5], [/\bsobot/i, 6], [/\bnedelj/i, 0],
 ];
-
 const EN_DAYS = [
   [/\bmonday/i, 1], [/\btuesday/i, 2], [/\bwednesday/i, 3],
   [/\bthursday/i, 4], [/\bfriday/i, 5], [/\bsaturday/i, 6], [/\bsunday/i, 0],
 ];
-
 const SL_MONTHS = [
   ['januar', 1], ['februar', 2], ['marc', 3],   ['april', 4],
   ['maj',    5], ['junij',   6], ['julij',  7],  ['avgust', 8],
   ['septem', 9], ['oktob',  10], ['novem',  11], ['decem',  12],
 ];
-
 const EN_MONTHS = {
   january:1, february:2, march:3, april:4, may:5, june:6,
   july:7, august:8, september:9, october:10, november:11, december:12,
@@ -130,7 +127,6 @@ function extractRelativeMinutes(text) {
 }
 
 function extractDate(text) {
-  // Returns { date: Date|null, tier: 'exact'|'relative'|'weekday'|'vague' }
   const lower = text.toLowerCase();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -165,7 +161,6 @@ function extractDate(text) {
   const inWeeks = lower.match(/\bin\s+(\d+)\s+week/);
   if (inWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d); }
 
-  // Explicit numeric formats (ordered: longest/most specific first)
   const yyyySlash = text.match(/\b(\d{4})\/(\d{2})\/(\d{2})\b/);
   if (yyyySlash) return exact(new Date(+yyyySlash[1], +yyyySlash[2]-1, +yyyySlash[3]));
 
@@ -319,27 +314,29 @@ function parseSmartReminderText(text, offset) {
   const title           = extractTitle(text, businessContext);
   const description     = extractDescription(text);
 
-  // "čez pol ure", "čez 30 minut", "in 2 hours" — absolute time, skip offset
+  // Sub-hour relative: "čez pol ure", "čez 30 minut", "in 2 hours" — no offset applied
   const relMins = extractRelativeMinutes(text);
   if (relMins !== null) {
     const now = new Date();
     now.setSeconds(0, 0);
     now.setMinutes(now.getMinutes() + relMins);
-    return { title, remindAt: now, description, confidence: 'high', warning: null, businessContext };
+    return { title, eventDate: now, remindAt: now, description, confidence: 'high', warning: null, businessContext };
   }
 
-  const { date: eventDate, tier } = extractDate(text);
+  const { date: rawDate, tier } = extractDate(text);
   const timeResult = extractTime(text);
   const multiDate  = countDateSignals(text) >= 2;
   const urgent     = detectUrgency(text);
 
-  if (!eventDate) {
+  if (!rawDate) {
     return {
-      title, remindAt: null, description, confidence: 'none', businessContext,
+      title, eventDate: null, remindAt: null, description, confidence: 'none', businessContext,
       warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
     };
   }
 
+  // Build event date+time
+  const eventDate = new Date(rawDate);
   eventDate.setHours(
     timeResult ? timeResult.hour   : 9,
     timeResult ? timeResult.minute : 0,
@@ -354,7 +351,12 @@ function parseSmartReminderText(text, offset) {
 
   const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
 
-  return { title, remindAt: applyReminderOffset(eventDate, offset), description, confidence, warning, businessContext };
+  return {
+    title,
+    eventDate,
+    remindAt: applyReminderOffset(new Date(eventDate), offset),
+    description, confidence, warning, businessContext,
+  };
 }
 
 function toDatetimeLocalValue(date) {
@@ -375,10 +377,8 @@ function escHtml(str) {
 function renderCard(r) {
   const status = getStatus(r);
   const { text, cls } = statusLabel(status);
-
   const card = document.createElement('div');
   card.className = `reminder-card${status === 'sent' ? ' sent' : ''}`;
-
   card.innerHTML = `
     <div class="card-header">
       <div class="card-title">${escHtml(r.title)}</div>
@@ -391,14 +391,12 @@ function renderCard(r) {
       <button class="btn-small danger" onclick="deleteReminder('${r.id}', this)">Izbriši</button>
     </div>
   `;
-
   return card;
 }
 
 function renderAll(reminders) {
   const upcoming = reminders.filter(r => !r.sent);
   const sent     = reminders.filter(r => r.sent);
-
   const upcomingList = document.getElementById('upcomingList');
   const sentList     = document.getElementById('sentList');
 
@@ -424,8 +422,7 @@ async function loadReminders() {
   try {
     const res = await fetch('/api/reminders');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    renderAll(data);
+    renderAll(await res.json());
   } catch (err) {
     console.error('Napaka pri nalaganju opomnikov:', err.message);
   }
@@ -437,7 +434,7 @@ async function sendNow(id, btn) {
   btn.disabled = true;
   btn.textContent = 'Pošiljam…';
   try {
-    const res = await fetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
+    const res  = await fetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Napaka');
     await loadReminders();
@@ -459,9 +456,9 @@ async function deleteReminder(id, btn) {
   }
 }
 
-// ── Form ──────────────────────────────────────────────────────
+// ── Form save ─────────────────────────────────────────────────
 
-document.getElementById('saveBtn').addEventListener('click', async () => {
+async function savePendingReminder() {
   const title    = document.getElementById('title').value.trim();
   const desc     = document.getElementById('description').value.trim();
   const localVal = document.getElementById('remindAt').value;
@@ -470,16 +467,19 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   const msg      = document.getElementById('formMessage');
 
   if (!title || !remindAt || !email) {
+    exitPreviewMode();
     showMessage(msg, 'Prosim izpolni naslov, datum in email.', 'error');
     return;
   }
 
-  const btn = document.getElementById('saveBtn');
-  btn.disabled = true;
-  btn.textContent = 'Shranjujem…';
+  exitPreviewMode();
+
+  const saveBtn = document.getElementById('saveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Shranjujem…';
 
   try {
-    const res = await fetch('/api/reminders', {
+    const res  = await fetch('/api/reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, description: desc, remindAt, email }),
@@ -496,10 +496,12 @@ document.getElementById('saveBtn').addEventListener('click', async () => {
   } catch (err) {
     showMessage(msg, err.message || 'Shranjevanje ni uspelo.', 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Shrani opomnik';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Shrani opomnik';
   }
-});
+}
+
+document.getElementById('saveBtn').addEventListener('click', savePendingReminder);
 
 document.getElementById('testEmailBtn').addEventListener('click', async () => {
   const email = document.getElementById('email').value.trim();
@@ -510,7 +512,7 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
   btn.textContent = 'Pošiljam…';
 
   try {
-    const res = await fetch('/api/test-email', {
+    const res  = await fetch('/api/test-email', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email || undefined }),
@@ -524,6 +526,43 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
     btn.disabled = false;
     btn.textContent = 'Pošlji testni Gmail';
   }
+});
+
+// ── Preview Mode ──────────────────────────────────────────────
+
+function enterPreviewMode(eventDate, remindAt) {
+  const manualSection = document.getElementById('manualSection');
+  manualSection.classList.add('preview-mode');
+
+  const fmtOpts = {
+    day: 'numeric', month: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  };
+
+  document.getElementById('previewTitle').textContent    = document.getElementById('title').value || '—';
+  document.getElementById('previewEvent').textContent    = eventDate ? eventDate.toLocaleString('sl-SI', fmtOpts) : '—';
+  document.getElementById('previewReminder').textContent = remindAt  ? remindAt.toLocaleString('sl-SI', fmtOpts) : '—';
+
+  document.getElementById('previewBlock').classList.remove('hidden');
+  document.getElementById('normalActions').classList.add('hidden');
+  document.getElementById('manualHint').classList.add('hidden');
+}
+
+function exitPreviewMode() {
+  const manualSection = document.getElementById('manualSection');
+  if (!manualSection.classList.contains('preview-mode')) return;
+
+  manualSection.classList.remove('preview-mode');
+  document.getElementById('previewBlock').classList.add('hidden');
+  document.getElementById('normalActions').classList.remove('hidden');
+  document.getElementById('manualHint').classList.remove('hidden');
+}
+
+document.getElementById('previewSaveBtn').addEventListener('click', savePendingReminder);
+
+document.getElementById('previewEditBtn').addEventListener('click', () => {
+  exitPreviewMode();
+  document.getElementById('title').focus();
 });
 
 // ── Mode Switch ───────────────────────────────────────────────
@@ -541,6 +580,7 @@ function setMode(mode) {
   if (mode === 'smart') {
     smartSection.classList.remove('hidden');
     manualSection.classList.add('hidden');
+    exitPreviewMode();
   } else {
     smartSection.classList.add('hidden');
     manualSection.classList.remove('hidden');
@@ -578,30 +618,6 @@ document.getElementById('customOffsetToggle').addEventListener('change', functio
 
 // ── Smart Paste ───────────────────────────────────────────────
 
-function showSmartSummary(remindAt, businessContext, confidence) {
-  const el = document.getElementById('smartSummary');
-  el.classList.remove('hidden');
-
-  if (!remindAt || confidence === 'none') {
-    el.textContent = 'Nisem 100% prepričana. Preveri naslov, opis in datum.';
-    el.className = 'smart-summary';
-    return;
-  }
-
-  const dateStr = remindAt.toLocaleString('sl-SI', {
-    day: 'numeric', month: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
-
-  const parts = [];
-  if (businessContext) parts.push(`Prepoznano: ${businessContext}`);
-  parts.push(`Opomnik: ${dateStr}`);
-  parts.push('Preveri in shrani.');
-
-  el.textContent = parts.join(' · ');
-  el.className = 'smart-summary ok';
-}
-
 document.getElementById('smartBtn').addEventListener('click', () => {
   const text      = document.getElementById('smartText').value.trim();
   const msg       = document.getElementById('smartMessage');
@@ -625,11 +641,10 @@ document.getElementById('smartBtn').addEventListener('click', () => {
       result.remindAt = applyCustomReminderOffset(result.remindAt, amount, unit);
     }
   } else {
-    const offset = document.getElementById('smartOffset').value;
-    result = parseSmartReminderText(text, offset);
+    result = parseSmartReminderText(text, document.getElementById('smartOffset').value);
   }
 
-  const { title, remindAt, description, confidence, warning, businessContext } = result;
+  const { title, eventDate, remindAt, description, confidence, warning } = result;
 
   document.getElementById('title').value       = title;
   document.getElementById('description').value = description;
@@ -647,17 +662,23 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     } else {
       showMessage(msg, 'Opomnik pripravljen 👌', 'success');
     }
+
+    revealManualForm();
+    enterPreviewMode(eventDate, remindAt);
+
   } else {
     remindAtInput.value = '';
     remindAtInput.style.borderColor = 'var(--amber)';
-    setTimeout(() => { remindAtInput.style.borderColor = ''; }, 4000);
+    setTimeout(() => { remindAtInput.style.borderColor = ''; }, 4500);
 
-    const errMsg = warning ? warning : 'Nisem prepričana glede datuma. Prosim izberi datum ročno.';
+    const errMsg = warning
+      ? warning
+      : 'Datuma nisem prepoznala 😅 Prosim izberi datum ročno.';
     showMessage(msg, errMsg, 'error');
-  }
 
-  showSmartSummary(remindAt, businessContext, confidence);
-  revealManualForm();
+    revealManualForm();
+    // Don't enter preview mode — let user fill in the date
+  }
 });
 
 // ── Quick Buttons ─────────────────────────────────────────────
@@ -679,6 +700,25 @@ document.getElementById('quickNextWeek').addEventListener('click', () => {
   const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
 
+// ── Email Remember ────────────────────────────────────────────
+
+const EMAIL_KEY = 'marusa_email';
+
+document.getElementById('rememberEmail').addEventListener('change', function () {
+  if (this.checked) {
+    const e = document.getElementById('email').value.trim();
+    if (e) localStorage.setItem(EMAIL_KEY, e);
+  } else {
+    localStorage.removeItem(EMAIL_KEY);
+  }
+});
+
+document.getElementById('email').addEventListener('input', function () {
+  if (document.getElementById('rememberEmail').checked && this.value.trim()) {
+    localStorage.setItem(EMAIL_KEY, this.value.trim());
+  }
+});
+
 // ── PWA Install ───────────────────────────────────────────────
 
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
@@ -686,11 +726,20 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 // ── Init ──────────────────────────────────────────────────────
 
 (function init() {
+  // Default reminder time: tomorrow at 09:00
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(9, 0, 0, 0);
   document.getElementById('remindAt').value = toDatetimeLocalValue(d);
 
+  // Restore saved email
+  const savedEmail = localStorage.getItem(EMAIL_KEY);
+  if (savedEmail) {
+    document.getElementById('email').value = savedEmail;
+    document.getElementById('rememberEmail').checked = true;
+  }
+
+  // Restore last mode
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
 })();
 

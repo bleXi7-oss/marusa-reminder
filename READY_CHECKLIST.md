@@ -26,8 +26,10 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 ## Pametni način
 
 - [ ] Paste teksta z datumom → Maruša prepozna datum
-- [ ] Obrazec se zapolni po razčlenjevanju
-- [ ] Opomnik se shrani
+- [ ] Prikaže se predogled (Opravilo / Dogodek / Opomnik)
+- [ ] Gumb "Shrani opomnik" v predogledu shrani opomnik
+- [ ] Gumb "Uredi" zapusti predogled in sprosti polja
+- [ ] Če datuma ni → sporoči "Datuma nisem prepoznala 😅" in odpre ročni vnos
 - [ ] Prepoznavanje poslovnih ključnih besed deluje (račun, plačilo, ponudba...)
 
 ## Ročni način
@@ -35,6 +37,7 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 - [ ] Direkten vnos naslova, opisa, datuma in emaila
 - [ ] Hitri gumbi delujejo (Čez 1 uro, Jutri ob 9, Čez 3 dni, Naslednji teden)
 - [ ] Opomnik se shrani
+- [ ] "Zapomni si moj email" — shrani email v localStorage in ga obnovi ob naslednjem obisku
 
 ## Offset
 

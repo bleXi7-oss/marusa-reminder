@@ -46,6 +46,20 @@ Two modes toggled by `.mode-switch` buttons, persisted in `localStorage('marusa_
 
 After a successful smart parse, `revealManualForm()` shows `#manualSection` with a fade animation and scrolls to it.
 
+### Preview / confirmation flow
+
+When Smart Paste succeeds (confidence `high` or `medium`), `enterPreviewMode(eventDate, remindAt)` is called:
+- Adds `.preview-mode` class to `#manualSection` — CSS locks fields via `pointer-events: none`
+- Shows `#previewBlock` with Opravilo / Dogodek / Opomnik rows
+- Hides `#normalActions` and `#manualHint`
+- `parseSmartReminderText` returns both `eventDate` (original event time) and `remindAt` (after offset) so both can be shown in the preview
+
+`exitPreviewMode()` reverses the above. Both `#saveBtn` and `#previewSaveBtn` call `savePendingReminder()` which calls `exitPreviewMode()` internally on success or validation failure.
+
+### Email remember
+
+`localStorage('marusa_email')` — saved when user types if checkbox is checked, cleared when unchecked. Loaded on init.
+
 ## Smart Paste parser (`public/app.js`)
 
 Rule-based only — no AI, no external APIs.

@@ -69,7 +69,8 @@ PORT=3001
 1. Prilepi besedilo (email, sporočilo, opomba)
 2. Izberi, koliko prej te opomni (preset ali po meri)
 3. Klikni **Razberi opomnik**
-4. Maruša zapolni obrazec — preveri in shrani
+4. Maruša prikaže predogled: Opravilo, Dogodek (čas iz besedila), Opomnik (čas po offsetu)
+5. Klikni **Shrani opomnik** za potrditev — ali **Uredi** za ročni popravek
 
 Podprti formati datumov:
 - `jutri ob 10`, `v petek`, `naslednji ponedeljek`
@@ -78,13 +79,17 @@ Podprti formati datumov:
 - `čez 3 dni`, `čez teden`, `in 2 days`
 - `čez pol ure`, `čez 30 minut`
 
-Parsiranje je **pravilo-osnovno, brez AI**.
+Parsiranje je **pravilo-osnovno, brez AI**. Če datuma ni mogoče prepoznati, Maruša sporoči napako in te prosi za ročni vnos.
 
 ### Ročni način
 
 1. Vnesi naslov, opis, datum in email
 2. Uporabi hitre gumbe: Čez 1 uro / Jutri ob 9 / Čez 3 dni / Naslednji teden
 3. Klikni **Shrani opomnik**
+
+### Zapomnitev emaila
+
+Obkljukaj **Zapomni si moj email** — naslov se shrani v brskalnik (localStorage) in se samodejno vpiše ob naslednjem obisku.
 
 ### Offset opomnika
 
