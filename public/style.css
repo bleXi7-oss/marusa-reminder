@@ -332,22 +332,6 @@ textarea { resize: vertical; }
   color: var(--accent);
 }
 
-/* ── Smart Summary ─────────────────────────────────────────── */
-.smart-summary {
-  margin-top: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--accent-lt);
-  color: var(--accent);
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.smart-summary.ok {
-  background: var(--green-lt);
-  color: var(--green);
-}
-
 /* ── Custom Offset ─────────────────────────────────────────── */
 .offset-row {
   display: flex;
