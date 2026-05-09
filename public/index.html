@@ -5,11 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Maruša Reminder</title>
   <meta name="description" content="Ne pozabi follow-upa." />
-  <meta name="theme-color" content="#f9f5f0" />
+  <meta name="theme-color" content="#c96a4a" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Maruša" />
   <link rel="manifest" href="/manifest.json" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
@@ -25,10 +28,21 @@
 
     <main>
 
-      <!-- Mode Switch -->
+      <!-- Mode Switch + Help -->
       <div class="mode-switch">
         <button class="mode-btn" id="modeSmartBtn">Pametni način</button>
         <button class="mode-btn" id="modeManualBtn">Ročni način</button>
+        <button class="btn-help" id="helpBtn" aria-label="Pomoč">?</button>
+      </div>
+
+      <!-- Help card -->
+      <div id="helpCard" class="help-card hidden">
+        <p><strong>Pametni način</strong> — Prilepi mail ali sporočilo. Maruša bo poiskala datum in pripravila opomnik.</p>
+        <p><strong>Ročni način</strong> — Vnesi naslov, datum in email ročno.</p>
+        <p><strong>Opomni me prej</strong> — Nastavlja, koliko pred rokom boš opomnik dobil/a.</p>
+        <p><strong>Razberi opomnik</strong> — Pripravi podatke iz besedila. Nič se še ne shrani.</p>
+        <p><strong>Shrani opomnik</strong> — Shrani in ob nastavljenem času pošlje email na tvoj Gmail.</p>
+        <div class="help-note">Opomniki delujejo samo, ko Node.js strežnik teče (<code>npm start</code>).</div>
       </div>
 
       <!-- Smart Paste section -->

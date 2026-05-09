@@ -119,8 +119,14 @@ Zapri terminal = opomniki se ne pošljejo.
 
 ## PWA namestitev
 
-**Telefon:** Odpri v brskalniku → meni → Dodaj na začetni zaslon  
-**Računalnik (Chrome/Edge):** Ikona namestitve v naslovni vrstici
+**Telefon (Android/iOS):** Odpri v brskalniku → meni → Dodaj na začetni zaslon  
+**Računalnik (Chrome/Edge):** Klikni ikono namestitve (⊕) v naslovni vrstici ali meni → Namesti aplikacijo
+
+Aplikacija ima ikono rožice (🌸) in deluje kot prava namizna/mobilna aplikacija.
+
+### Gumb za pomoč (?)
+
+Klikni `?` gumb poleg izbirnika načina za kratek opis kako aplikacija deluje.
 
 ---
 

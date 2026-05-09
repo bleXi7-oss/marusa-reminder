@@ -614,6 +614,13 @@ function revealManualForm() {
 document.getElementById('modeSmartBtn').addEventListener('click', () => setMode('smart'));
 document.getElementById('modeManualBtn').addEventListener('click', () => setMode('manual'));
 
+document.getElementById('helpBtn').addEventListener('click', function () {
+  const card = document.getElementById('helpCard');
+  const show = card.classList.contains('hidden');
+  card.classList.toggle('hidden', !show);
+  this.classList.toggle('active', show);
+});
+
 // ── Custom Offset Toggle ──────────────────────────────────────
 
 document.getElementById('customOffsetToggle').addEventListener('change', function () {

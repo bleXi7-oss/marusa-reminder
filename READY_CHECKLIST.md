@@ -58,7 +58,11 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 
 - [ ] `manifest.json` dostopen na `/manifest.json`
 - [ ] `service-worker.js` dostopen na `/service-worker.js`
-- [ ] Ikona namestitve vidna v brskalniku (Chrome/Edge)
+- [ ] Ikone obstajajo v `public/icons/` (icon-192.png, icon-512.png, apple-touch-icon.png ...)
+- [ ] Favicon viden v zavihku brskalnika (rožica)
+- [ ] Ikona namestitve vidna v Chrome/Edge (gumb ⊕ v naslovni vrstici)
+- [ ] Aplikacija deluje kot standalone po namestitvi
+- [ ] Gumb za pomoč (?) prikazuje razlago
 
 ## Git
 
