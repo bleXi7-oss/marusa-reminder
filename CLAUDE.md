@@ -71,7 +71,7 @@ Key functions:
 - `detectBusinessContext(text)` → label string (račun, plačilo, ponudba...) or null
 - `extractTitle(text, businessContext)` → clean title, max 80 chars
 - `extractDescription(text)` → clean summary, max 140 chars
-- `parseSmartReminderText(text, offset)` → `{ title, remindAt, description, confidence, warning, businessContext }`
+- `parseSmartReminderText(text, offset)` → `{ title, eventDate, remindAt, description, confidence, warning, businessContext }`
 
 **Confidence tiers:**
 - `high` = exact date + specific time → green, prefill form
@@ -96,6 +96,8 @@ Key functions:
 ## PWA
 
 `public/manifest.json` + `public/service-worker.js`. Registered in `app.js` init.
+
+Icons are pre-generated PNGs in `public/icons/`. Source SVG: `public/icons/icon.svg`. To regenerate: `node generate-icons.js` (requires `sharp` devDependency, already installed).
 
 ## Language
 
