@@ -249,7 +249,7 @@ textarea { resize: vertical; }
 }
 
 .btn-small {
-  padding: 8px 14px;
+  padding: 10px 16px;
   font-size: 0.82rem;
   background: var(--bg);
   color: var(--muted);

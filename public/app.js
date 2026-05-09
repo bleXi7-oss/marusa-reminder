@@ -302,10 +302,10 @@ function applyReminderOffset(date, offset) {
 function applyCustomReminderOffset(eventDate, amount, unit) {
   const d = new Date(eventDate);
   const n = parseInt(amount, 10);
-  if (unit === 'minut')                                             d.setMinutes(d.getMinutes() - n);
-  else if (unit === 'ura' || unit === 'uri' || unit === 'ur')      d.setHours(d.getHours() - n);
-  else if (unit === 'dan' || unit === 'dni')                       d.setDate(d.getDate() - n);
-  else if (unit === 'teden' || unit === 'tedna' || unit === 'tednov') d.setDate(d.getDate() - n * 7);
+  if      (unit === 'minut')   d.setMinutes(d.getMinutes() - n);
+  else if (unit === 'ur')      d.setHours(d.getHours() - n);
+  else if (unit === 'dni')     d.setDate(d.getDate() - n);
+  else if (unit === 'tednov')  d.setDate(d.getDate() - n * 7);
   return d;
 }
 
@@ -489,7 +489,12 @@ async function savePendingReminder() {
 
     document.getElementById('title').value = '';
     document.getElementById('description').value = '';
-    document.getElementById('remindAt').value = '';
+    document.getElementById('smartText').value = '';
+
+    const nextDay = new Date();
+    nextDay.setDate(nextDay.getDate() + 1);
+    nextDay.setHours(9, 0, 0, 0);
+    document.getElementById('remindAt').value = toDatetimeLocalValue(nextDay);
 
     showMessage(msg, '✓ Opomnik shranjen!', 'success');
     await loadReminders();
