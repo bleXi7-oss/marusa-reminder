@@ -57,6 +57,11 @@
         <p><strong>Razberi opomnik</strong> — Pripravi podatke iz besedila. Nič se še ne shrani.</p>
         <p><strong>Shrani opomnik</strong> — Shrani in ob nastavljenem času pošlje email.</p>
         <div class="help-note">Opomniki delujejo samo, ko Node.js strežnik teče (<code>npm start</code>).</div>
+        <div class="help-test">
+          <p class="help-test-hint">Preveri ali email pošiljanje deluje pravilno.</p>
+          <button id="testEmailBtn" class="btn-secondary help-test-btn">Pošlji testni Gmail</button>
+          <div id="testEmailMsg" class="message hidden"></div>
+        </div>
         <div class="help-errors">
           <div class="help-errors-title">Napake / kaj preveriti</div>
           <div class="help-error-row"><span class="help-err-code">ERR-001</span> Napačna koda za dostop — preveri APP_ACCESS_CODE v Render.</div>
@@ -171,7 +176,6 @@
         <!-- Normal actions (visible when not in preview mode) -->
         <div class="form-actions" id="normalActions">
           <button id="saveBtn" class="btn-primary">Shrani opomnik</button>
-          <button id="testEmailBtn" class="btn-secondary">Pošlji testni Gmail</button>
         </div>
 
         <div id="formMessage" class="message hidden"></div>

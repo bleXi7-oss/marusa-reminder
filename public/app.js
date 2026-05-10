@@ -689,7 +689,7 @@ document.getElementById('saveBtn').addEventListener('click', savePendingReminder
 
 document.getElementById('testEmailBtn').addEventListener('click', async () => {
   const email = document.getElementById('email').value.trim();
-  const msg   = document.getElementById('formMessage');
+  const msg   = document.getElementById('testEmailMsg');
   const btn   = document.getElementById('testEmailBtn');
 
   if (!validateEmail(email, msg)) return;

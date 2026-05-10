@@ -587,6 +587,25 @@ input.field-error, textarea.field-error {
   opacity: 0.85;
 }
 
+/* ── Help card test email section ─────────────────────────── */
+.help-test {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.help-test-hint {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.help-test-btn {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
 /* ── Help card errors section ──────────────────────────────── */
 .help-errors {
   margin-top: 12px;
