@@ -436,10 +436,11 @@ async function sendNow(id, btn) {
   try {
     const res  = await fetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Napaka');
+    if (!res.ok) throw new Error(data.message || data.error || 'Napaka');
     await loadReminders();
   } catch (err) {
     alert(err.message || 'Pošiljanje ni uspelo. Preveri Gmail nastavitve.');
+  } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji zdaj';
   }
@@ -523,10 +524,10 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
       body: JSON.stringify({ email: email || undefined }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Napaka');
+    if (!res.ok) throw new Error(data.message || data.error || 'Napaka');
     showMessage(msg, '✓ Testni email poslan! Preveri Gmail.', 'success');
   } catch (err) {
-    showMessage(msg, err.message || 'Gmail napaka. Preveri App Password.', 'error');
+    showMessage(msg, err.message || 'Gmail napaka. Preveri nastavitve.', 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji testni Gmail';

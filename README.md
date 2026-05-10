@@ -149,6 +149,64 @@ files/
 
 ---
 
+## Namestitev na Render
+
+### Obvezne Environment Variables na Render
+
+| Spremenljivka | Primer vrednosti |
+|---|---|
+| `GMAIL_USER` | `tvoj.email@gmail.com` |
+| `GMAIL_APP_PASSWORD` | `xxxx xxxx xxxx xxxx` |
+| `MAIL_FROM` | `tvoj.email@gmail.com` |
+| `DEFAULT_REMINDER_EMAIL` | `tvoj.email@gmail.com` |
+| `NODE_ENV` | `production` |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_SECURE` | `true` |
+
+### Kako preveriti nastavitve na Render
+
+Ko je app deployiran, odpri:
+
+```
+https://marusa-reminder.onrender.com/api/email-status
+```
+
+Odgovor prikaže, katere spremenljivke so nastavljene (brez gesel):
+
+```json
+{
+  "provider": "gmail-smtp",
+  "hasGmailUser": true,
+  "hasAppPassword": true,
+  "hasMailFrom": true,
+  "hasDefaultReminderEmail": true,
+  "smtpHost": "smtp.gmail.com",
+  "smtpPort": 465,
+  "smtpSecure": true
+}
+```
+
+Če je katerikoli `has...` = `false`, manjka env var na Render.
+
+### Alternativne nastavitve za Render (port 587)
+
+Nekateri hosting ponudniki blokirajo port 465. Preizkusi port 587:
+
+```
+SMTP_PORT=587
+SMTP_SECURE=false
+```
+
+### Če Render še vedno kaže "Connection timeout"
+
+Render free tier in nekateri hosting ponudniki blokirajo ali omejijo odhodne SMTP povezave. V tem primeru Gmail SMTP morda ni zanesljiv na Render free tier. Naslednja rešitev za produkcijo je:
+
+- **Gmail API (OAuth)** — brez SMTP, direktna Google API integracija
+- **Sendgrid / Mailgun / Resend / Brevo** — email API ponudniki s prostim nivojem
+
+---
+
 ## Odpravljanje težav
 
 **Gmail ne deluje:**

@@ -21,6 +21,15 @@ GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 MAIL_FROM=tvoj.email@gmail.com
 DEFAULT_REMINDER_EMAIL=tvoj.email@gmail.com
 PORT=3001
+NODE_ENV=production
+
+# Optional SMTP overrides (defaults shown)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+# Alternate for Render if port 465 is blocked:
+# SMTP_PORT=587
+# SMTP_SECURE=false
 ```
 
 Never touch or overwrite `.env` — user configures it manually.
@@ -90,8 +99,12 @@ Key functions:
 | GET | `/api/reminders` | List all |
 | POST | `/api/reminders` | Create (`{title, description?, remindAt, email}`) |
 | DELETE | `/api/reminders/:id` | Delete |
-| POST | `/api/reminders/:id/send-now` | Force-send |
-| POST | `/api/test-email` | Test Gmail (`{email?}`) |
+| POST | `/api/reminders/:id/send-now` | Force-send — returns `{ok, message, code}` |
+| POST | `/api/test-email` | Test Gmail (`{email?}`) — returns `{ok, message, code}` |
+| GET | `/api/email-status` | Safe SMTP config check (no secrets) |
+
+Email endpoints return `{ ok: true, message }` on success and `{ ok: false, message, code }` on error.
+Error codes: `AUTH_ERROR`, `CONNECTION_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
 
 ## PWA
 

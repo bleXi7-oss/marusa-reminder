@@ -64,6 +64,15 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 - [ ] Aplikacija deluje kot standalone po namestitvi
 - [ ] Gumb za pomoč (?) prikazuje razlago
 
+## Render deployment
+
+- [ ] Render env vars nastavljeni: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MAIL_FROM`, `DEFAULT_REMINDER_EMAIL`
+- [ ] Render env vars nastavljeni: `NODE_ENV=production`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`
+- [ ] `/api/email-status` vrne `hasGmailUser: true` in `hasAppPassword: true`
+- [ ] Testni email poslan prek Render (`Pošlji testni Gmail`)
+- [ ] Če `Connection timeout` na port 465 → preizkusi `SMTP_PORT=587`, `SMTP_SECURE=false`
+- [ ] Napake v UI prikazujejo slovensko sporočilo (ne generično "Preveri App Password")
+
 ## Git
 
 - [ ] `git status` — `.env` ni med staged datotekami
