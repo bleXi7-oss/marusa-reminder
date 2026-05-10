@@ -158,6 +158,7 @@ Zapri terminal = opomniki se ne pošljejo.
 | ERR-013 | SMTP blokiran ali auth napaka | Na Render: uporabi Resend |
 | ERR-014 | Datum ni prepoznan | Izberi datum ročno |
 | ERR-015 | Nepričakovana napaka | Preveri konzolo strežnika |
+| ERR-016 | Preveč zahtevkov | Počakaj 15 minut in poskusi znova |
 
 ---
 

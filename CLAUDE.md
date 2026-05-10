@@ -127,7 +127,15 @@ All routes except `/api/health` and `/api/auth` require `X-App-Code` header when
 
 All error responses: `{ ok: false, code: "ERR-XXX", message: "...", action: "..." }`.
 
-Error code registry (ERR-001 through ERR-015) defined in `ERRORS` object in `server.js`. `makeError(code, override?)` builds the response. `smtpErrorMessage(err)` maps nodemailer/Resend errors to ERR codes.
+Error code registry (ERR-001 through ERR-016) defined in `ERRORS` object in `server.js`. `makeError(code, override?)` builds the response. `smtpErrorMessage(err)` maps nodemailer/Resend errors to ERR codes.
+
+## Rate limiting
+
+`express-rate-limit` protects two routes against brute-force:
+- `/api/auth` — 10 req / 15 min per IP (strict; guards the access code)
+- `/api/test-email` — 5 req / 15 min per IP (moderate; prevents email spam)
+
+Returns `ERR-016` + HTTP 429 when exceeded. `app.set('trust proxy', 1)` ensures correct IP detection behind Render's proxy. Store is in-memory — resets on server restart (acceptable for personal use).
 
 ## Access protection
 
@@ -163,6 +171,8 @@ Startup runs `runSmtpDiagnostics()` (async, non-blocking) — skipped when `EMAI
 `public/manifest.json` + `public/service-worker.js`. Registered in `app.js` init.
 
 Icons are pre-generated PNGs in `public/icons/`. Source SVG: `public/icons/icon.svg`. To regenerate: `node generate-icons.js` (requires `sharp` devDependency, already installed).
+
+Current cache name: `marusa-v2`. The `activate` handler deletes all caches whose name differs from the current constant, so stale caches from previous deployments are automatically purged. Bump the constant when static assets need forced invalidation.
 
 ## Language
 

@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express    = require('express');
+const rateLimit  = require('express-rate-limit');
 const nodemailer = require('nodemailer');
 const dns        = require('dns');
 const fs         = require('fs');
@@ -15,6 +16,8 @@ const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
   ? process.env.SMTP_SECURE !== 'false'
   : SMTP_PORT === 465;
+
+app.set('trust proxy', 1); // required for correct req.ip behind Render's proxy
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -50,12 +53,35 @@ const ERRORS = {
   'ERR-013': { message: 'Gmail SMTP blokiran.',                  action: 'Uporabi Resend ponudnika, ne Gmail SMTP.' },
   'ERR-014': { message: 'Parser ni našel datuma.',               action: 'Izberi datum ročno.' },
   'ERR-015': { message: 'Nepričakovana napaka.',                 action: 'Preveri Render logs.' },
+  'ERR-016': { message: 'Preveč zahtevkov.',                    action: 'Počakaj 15 minut in poskusi znova.' },
 };
 
 function makeError(code, override = {}) {
   const e = ERRORS[code] || ERRORS['ERR-015'];
   return { ok: false, code, message: e.message, action: e.action, ...override };
 }
+
+// ── Rate limiting ─────────────────────────────────────────────
+
+function rateLimitHandler(req, res) {
+  res.status(429).json(makeError('ERR-016'));
+}
+
+const authLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             10,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         rateLimitHandler,
+});
+
+const testEmailLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             5,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  handler:         rateLimitHandler,
+});
 
 // ── Access control ────────────────────────────────────────────
 
@@ -314,7 +340,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Protected: verifies access code (used by frontend unlock flow)
-app.get('/api/auth', requireAuth, (req, res) => {
+app.get('/api/auth', authLimiter, requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
@@ -432,7 +458,7 @@ app.post('/api/reminders/:id/send-now', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/test-email', requireAuth, async (req, res) => {
+app.post('/api/test-email', testEmailLimiter, requireAuth, async (req, res) => {
   const to = req.body.email || process.env.DEFAULT_REMINDER_EMAIL;
 
   if (!to) return res.status(400).json(makeError('ERR-008', { message: 'Manjka email naslov.' }));
