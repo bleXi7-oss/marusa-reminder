@@ -68,10 +68,14 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 
 - [ ] Render env vars nastavljeni: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MAIL_FROM`, `DEFAULT_REMINDER_EMAIL`
 - [ ] Render env vars nastavljeni: `NODE_ENV=production`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`
-- [ ] `/api/email-status` vrne `hasGmailUser: true` in `hasAppPassword: true`
+- [ ] `/api/email-status` vrne vse `has...` vrednosti `true`
+- [ ] `/api/smtp-test` vrne `ok: true` (potrdi TCP dostop do Gmail SMTP)
+- [ ] Render startup log prikazuje `[SMTP DNS]` z resolvanimi IP naslovi
+- [ ] Render startup log prikazuje `[SMTP verify] OK` ali `[SMTP verify] Napaka` z `elapsedMs`
 - [ ] Testni email poslan prek Render (`Pošlji testni Gmail`)
-- [ ] Če `Connection timeout` na port 465 → preizkusi `SMTP_PORT=587`, `SMTP_SECURE=false`
-- [ ] Napake v UI prikazujejo slovensko sporočilo (ne generično "Preveri App Password")
+- [ ] Napake v UI prikazujejo slovensko sporočilo (timeout / auth / DNS — ne generično)
+- [ ] Če `/api/smtp-test` vrne `CONNECTION_ERROR` z `elapsedMs ~30000` → Render blokira SMTP
+- [ ] Če SMTP blokiran → načrtuj zamenjavo z Resend/Brevo API (samo `sendEmail()` v server.js)
 
 ## Git
 

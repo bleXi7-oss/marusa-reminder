@@ -1,15 +1,16 @@
 require('dotenv').config();
-const express = require('express');
+const express   = require('express');
 const nodemailer = require('nodemailer');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
+const dns       = require('dns');
+const fs        = require('fs');
+const path      = require('path');
+const crypto    = require('crypto');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const app       = express();
+const PORT      = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'reminders.json');
 
-// SMTP configuration — defaults to Gmail port 465 (TLS)
+// SMTP config — defaults to Gmail port 465 (TLS)
 const SMTP_HOST   = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
@@ -52,7 +53,16 @@ function saveReminders(reminders) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(reminders, null, 2));
 }
 
-// ── Email helpers ─────────────────────────────────────────────
+// ── Email provider ────────────────────────────────────────────
+//
+// Current provider: Gmail SMTP via nodemailer (createTransporter below).
+//
+// Production fallback path — if Render blocks outbound SMTP:
+//   1. Set RESEND_API_KEY in Render environment variables.
+//   2. Replace sendEmail() body with a Resend API call (npm install resend).
+//   3. No other code needs to change — all callers use sendEmail().
+//
+// sendEmail() is the single call site for all outgoing email.
 
 function createTransporter() {
   return nodemailer.createTransport({
@@ -67,6 +77,12 @@ function createTransporter() {
     greetingTimeout:   15000,
     socketTimeout:     30000,
   });
+}
+
+async function sendEmail({ to, from, subject, text }) {
+  // Future: if (process.env.RESEND_API_KEY) { ... use Resend ... return; }
+  const transporter = createTransporter();
+  await transporter.sendMail({ from, to, subject, text });
 }
 
 function checkEmailConfig() {
@@ -91,10 +107,11 @@ function smtpErrorMessage(err) {
     msg.includes('authentication failed') ||
     msg.includes('authentication')
   ) {
-    return {
-      message: 'Gmail prijava ni uspela. Preveri Gmail App Password.',
-      code:    'AUTH_ERROR',
-    };
+    return { message: 'Gmail prijava ni uspela. Preveri Gmail App Password.', code: 'AUTH_ERROR' };
+  }
+
+  if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH') {
+    return { message: 'SMTP strežnika ni mogoče najti. Preveri SMTP_HOST nastavitev.', code: 'DNS_ERROR' };
   }
 
   if (
@@ -106,37 +123,28 @@ function smtpErrorMessage(err) {
     msg.includes('timeout') ||
     msg.includes('connect')
   ) {
-    return {
-      message: 'Povezava do Gmail SMTP ni uspela. Hosting lahko blokira SMTP povezavo.',
-      code:    'CONNECTION_ERROR',
-    };
+    return { message: 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.', code: 'CONNECTION_ERROR' };
   }
 
-  return {
-    message: 'Pošiljanje emaila ni uspelo. Preveri Render logs.',
-    code:    'UNKNOWN_ERROR',
-  };
+  return { message: 'Pošiljanje ni uspelo. Preveri Render logs.', code: 'UNKNOWN_ERROR' };
 }
 
 function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleString('sl-SI', {
     weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    year:    'numeric',
+    month:   'long',
+    day:     'numeric',
+    hour:    '2-digit',
+    minute:  '2-digit',
   });
 }
 
 async function sendReminderEmail(reminder) {
-  const transporter = createTransporter();
-  const dateFormatted = formatDate(reminder.remindAt);
-
-  await transporter.sendMail({
-    from: `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
-    to: reminder.email,
+  await sendEmail({
+    from:    `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
+    to:      reminder.email,
     subject: `Opomnik: ${reminder.title}`,
     text: [
       'Hej 👋',
@@ -147,19 +155,65 @@ async function sendReminderEmail(reminder) {
       '',
       reminder.description ? `Opis:\n${reminder.description}` : '',
       '',
-      `Čas:\n${dateFormatted}`,
+      `Čas:\n${formatDate(reminder.remindAt)}`,
       '',
       '— Maruša Reminder',
     ].join('\n'),
   });
 }
 
+// ── Startup SMTP diagnostics ──────────────────────────────────
+// Runs async after server start — does not block HTTP serving.
+
+async function runSmtpDiagnostics() {
+  // Step 1: DNS resolution
+  try {
+    const addresses = await new Promise((resolve, reject) =>
+      dns.resolve4(SMTP_HOST, (err, addrs) => err ? reject(err) : resolve(addrs))
+    );
+    console.log('[SMTP DNS]', JSON.stringify({ host: SMTP_HOST, resolved: addresses }));
+  } catch (err) {
+    console.error('[SMTP DNS] Napaka:', JSON.stringify({
+      host:    SMTP_HOST,
+      errCode: err.code,
+      errMsg:  err.message,
+    }));
+  }
+
+  // Step 2: Connection verify (skipped if env vars missing)
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    console.log('[SMTP verify] Preskočeno — manjkajo GMAIL_USER ali GMAIL_APP_PASSWORD.');
+    return;
+  }
+
+  const t     = createTransporter();
+  const start = Date.now();
+  try {
+    await t.verify();
+    console.log('[SMTP verify] OK', JSON.stringify({
+      smtpHost:  SMTP_HOST,
+      smtpPort:  SMTP_PORT,
+      secure:    SMTP_SECURE,
+      elapsedMs: Date.now() - start,
+    }));
+  } catch (err) {
+    console.error('[SMTP verify] Napaka:', JSON.stringify({
+      smtpHost:  SMTP_HOST,
+      smtpPort:  SMTP_PORT,
+      secure:    SMTP_SECURE,
+      errCode:   err.code,
+      errMsg:    err.message,
+      elapsedMs: Date.now() - start,
+    }));
+  }
+}
+
 // ── Reminder checker (runs every 60s) ─────────────────────────
 
 async function checkAndSendReminders() {
   const reminders = loadReminders();
-  const now = Date.now();
-  const pending = reminders.filter(r => !r.sent);
+  const now       = Date.now();
+  const pending   = reminders.filter(r => !r.sent);
 
   console.log(`[${new Date().toLocaleString('sl-SI')}] Strežniški čas. Preverjam ${pending.length} opomnikov.`);
 
@@ -170,9 +224,9 @@ async function checkAndSendReminders() {
       console.log(`  → Pošiljam: "${r.title}" (nastavljeno za ${new Date(r.remindAt).toLocaleString('sl-SI')})`);
       try {
         await sendReminderEmail(r);
-        r.sent = true;
+        r.sent   = true;
         r.sentAt = new Date().toISOString();
-        changed = true;
+        changed  = true;
         console.log(`  ✓ Poslano: "${r.title}"`);
       } catch (err) {
         console.error(`  ✗ Napaka pri pošiljanju "${r.title}":`, JSON.stringify({
@@ -198,15 +252,71 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/email-status', (req, res) => {
   res.json({
-    provider:               'gmail-smtp',
-    hasGmailUser:           !!process.env.GMAIL_USER,
-    hasAppPassword:         !!process.env.GMAIL_APP_PASSWORD,
-    hasMailFrom:            !!process.env.MAIL_FROM,
+    provider:                'gmail-smtp',
+    hasGmailUser:            !!process.env.GMAIL_USER,
+    hasAppPassword:          !!process.env.GMAIL_APP_PASSWORD,
+    hasMailFrom:             !!process.env.MAIL_FROM,
     hasDefaultReminderEmail: !!process.env.DEFAULT_REMINDER_EMAIL,
-    smtpHost:               SMTP_HOST,
-    smtpPort:               SMTP_PORT,
-    smtpSecure:             SMTP_SECURE,
+    smtpHost:                SMTP_HOST,
+    smtpPort:                SMTP_PORT,
+    smtpSecure:              SMTP_SECURE,
   });
+});
+
+// Diagnostic endpoint — runs transporter.verify() and reports result.
+// Use this to confirm whether Render can reach Gmail SMTP at all.
+app.get('/api/smtp-test', async (req, res) => {
+  const configErr = checkEmailConfig();
+  if (configErr) {
+    return res.json({ ok: false, ...configErr, elapsedMs: 0 });
+  }
+
+  // DNS probe
+  let dnsResult = null;
+  try {
+    dnsResult = await new Promise((resolve, reject) =>
+      dns.resolve4(SMTP_HOST, (err, addrs) => err ? reject(err) : resolve(addrs))
+    );
+  } catch (err) {
+    dnsResult = { error: err.code };
+  }
+
+  const t     = createTransporter();
+  const start = Date.now();
+  try {
+    await t.verify();
+    const elapsedMs = Date.now() - start;
+    console.log('[smtp-test endpoint] OK', JSON.stringify({ smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, secure: SMTP_SECURE, elapsedMs }));
+    res.json({
+      ok:         true,
+      message:    'SMTP povezava uspešna.',
+      smtpHost:   SMTP_HOST,
+      smtpPort:   SMTP_PORT,
+      smtpSecure: SMTP_SECURE,
+      dns:        dnsResult,
+      elapsedMs,
+    });
+  } catch (err) {
+    const elapsedMs = Date.now() - start;
+    console.error('[smtp-test endpoint] Napaka:', JSON.stringify({
+      smtpHost:  SMTP_HOST,
+      smtpPort:  SMTP_PORT,
+      secure:    SMTP_SECURE,
+      errCode:   err.code,
+      errMsg:    err.message,
+      elapsedMs,
+    }));
+    const errRes = smtpErrorMessage(err);
+    res.json({
+      ok:         false,
+      ...errRes,
+      smtpHost:   SMTP_HOST,
+      smtpPort:   SMTP_PORT,
+      smtpSecure: SMTP_SECURE,
+      dns:        dnsResult,
+      elapsedMs,
+    });
+  }
 });
 
 app.get('/api/reminders', (req, res) => {
@@ -221,14 +331,14 @@ app.post('/api/reminders', (req, res) => {
   }
 
   const reminder = {
-    id: crypto.randomUUID(),
+    id:          crypto.randomUUID(),
     title,
     description: description || '',
     remindAt,
     email,
-    sent: false,
-    sentAt: null,
-    createdAt: new Date().toISOString(),
+    sent:        false,
+    sentAt:      null,
+    createdAt:   new Date().toISOString(),
   };
 
   const reminders = loadReminders();
@@ -240,7 +350,7 @@ app.post('/api/reminders', (req, res) => {
 
 app.delete('/api/reminders/:id', (req, res) => {
   const reminders = loadReminders();
-  const filtered = reminders.filter(r => r.id !== req.params.id);
+  const filtered  = reminders.filter(r => r.id !== req.params.id);
 
   if (filtered.length === reminders.length) {
     return res.status(404).json({ error: 'Opomnik ni bil najden.' });
@@ -252,7 +362,7 @@ app.delete('/api/reminders/:id', (req, res) => {
 
 app.post('/api/reminders/:id/send-now', async (req, res) => {
   const reminders = loadReminders();
-  const reminder = reminders.find(r => r.id === req.params.id);
+  const reminder  = reminders.find(r => r.id === req.params.id);
 
   if (!reminder) {
     return res.status(404).json({ ok: false, message: 'Opomnik ni bil najden.', code: 'NOT_FOUND' });
@@ -265,7 +375,7 @@ app.post('/api/reminders/:id/send-now', async (req, res) => {
 
   try {
     await sendReminderEmail(reminder);
-    reminder.sent = true;
+    reminder.sent   = true;
     reminder.sentAt = new Date().toISOString();
     saveReminders(reminders);
     res.json({ ok: true, message: 'Email poslan.' });
@@ -297,12 +407,11 @@ app.post('/api/test-email', async (req, res) => {
   }
 
   try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
+    await sendEmail({
+      from:    `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
       to,
       subject: 'Testni email — Maruša Reminder',
-      text: 'Hej 👋\n\nGmail povezava deluje! Maruša Reminder je pripravljena.\n\n— Maruša Reminder',
+      text:    'Hej 👋\n\nGmail povezava deluje! Maruša Reminder je pripravljena.\n\n— Maruša Reminder',
     });
     res.json({ ok: true, message: 'Email poslan.' });
   } catch (err) {
@@ -324,4 +433,6 @@ app.post('/api/test-email', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🌸 Maruša Reminder teče na http://localhost:${PORT}\n`);
+  // Run SMTP diagnostics after server is up — non-blocking
+  runSmtpDiagnostics().catch(() => {});
 });

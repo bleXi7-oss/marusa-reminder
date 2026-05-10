@@ -164,46 +164,81 @@ files/
 | `SMTP_PORT` | `465` |
 | `SMTP_SECURE` | `true` |
 
-### Kako preveriti nastavitve na Render
-
-Ko je app deployiran, odpri:
+### Korak 1 — Preveri nastavitve
 
 ```
 https://marusa-reminder.onrender.com/api/email-status
 ```
 
-Odgovor prikaže, katere spremenljivke so nastavljene (brez gesel):
+Vse `has...` vrednosti morajo biti `true`. Če je katerakoli `false`, manjka env var na Render.
 
 ```json
 {
   "provider": "gmail-smtp",
   "hasGmailUser": true,
   "hasAppPassword": true,
-  "hasMailFrom": true,
-  "hasDefaultReminderEmail": true,
   "smtpHost": "smtp.gmail.com",
   "smtpPort": 465,
   "smtpSecure": true
 }
 ```
 
-Če je katerikoli `has...` = `false`, manjka env var na Render.
+### Korak 2 — Diagnostičen SMTP test
 
-### Alternativne nastavitve za Render (port 587)
+```
+https://marusa-reminder.onrender.com/api/smtp-test
+```
 
-Nekateri hosting ponudniki blokirajo port 465. Preizkusi port 587:
+Ta endpoint poskusi vzpostaviti pravo SMTP TCP povezavo in vrne:
+
+```json
+{ "ok": true, "smtpHost": "smtp.gmail.com", "smtpPort": 465, "elapsedMs": 812 }
+```
+
+ali ob napaki:
+
+```json
+{
+  "ok": false,
+  "code": "CONNECTION_ERROR",
+  "message": "Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.",
+  "smtpPort": 465,
+  "elapsedMs": 30012
+}
+```
+
+Ključne vrednosti `code`:
+
+| code | Pomen |
+|---|---|
+| `CONNECTION_ERROR` | TCP/timeout blokada — Render verjetno blokira SMTP |
+| `AUTH_ERROR` | Napačen App Password ali GMAIL_USER |
+| `DNS_ERROR` | SMTP_HOST ni dosegljiv (napačno ime) |
+| `MISSING_CONFIG` | GMAIL_USER ali GMAIL_APP_PASSWORD nista nastavljena |
+
+### Korak 3 — Če port 465 ne deluje
+
+Preizkusi port 587:
 
 ```
 SMTP_PORT=587
 SMTP_SECURE=false
 ```
 
-### Če Render še vedno kaže "Connection timeout"
+### Korak 4 — Če SMTP na Render ne deluje
 
-Render free tier in nekateri hosting ponudniki blokirajo ali omejijo odhodne SMTP povezave. V tem primeru Gmail SMTP morda ni zanesljiv na Render free tier. Naslednja rešitev za produkcijo je:
+Gmail SMTP na Render free tier pogosto ni zanesljiv — Render blokira odhodne SMTP povezave.
+Startup log pokaže `[SMTP verify] Napaka` z `elapsedMs` ~30000 (timeout).
 
-- **Gmail API (OAuth)** — brez SMTP, direktna Google API integracija
-- **Sendgrid / Mailgun / Resend / Brevo** — email API ponudniki s prostim nivojem
+**Priporočen naslednji korak: zamenjaj SMTP z email API ponudnikom.**
+
+Koda je pripravljena za zamenjavo — v `server.js` je `sendEmail()` funkcija, ki je edino klicno mesto.
+Zamenjava zahteva le spremembo njenega telesa:
+
+- **Resend** (`resend.com`) — `npm install resend`, nastavi `RESEND_API_KEY`
+- **Brevo / Sendgrid / Mailgun** — podobno, brez SMTP
+
+Gmail SMTP deluje zanesljivo samo lokalno ali na hosting ponudnikih, ki ne blokirajo SMTP.
 
 ---
 

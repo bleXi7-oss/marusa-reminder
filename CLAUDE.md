@@ -102,9 +102,23 @@ Key functions:
 | POST | `/api/reminders/:id/send-now` | Force-send — returns `{ok, message, code}` |
 | POST | `/api/test-email` | Test Gmail (`{email?}`) — returns `{ok, message, code}` |
 | GET | `/api/email-status` | Safe SMTP config check (no secrets) |
+| GET | `/api/smtp-test` | Live SMTP verify + DNS probe + `elapsedMs` (no secrets) |
 
 Email endpoints return `{ ok: true, message }` on success and `{ ok: false, message, code }` on error.
-Error codes: `AUTH_ERROR`, `CONNECTION_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
+Error codes: `AUTH_ERROR`, `CONNECTION_ERROR`, `DNS_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
+
+## Email provider architecture
+
+All outgoing email goes through `sendEmail({ to, from, subject, text })` in `server.js`.
+This is the single point to swap providers. Current provider: Gmail SMTP via nodemailer.
+
+Startup runs `runSmtpDiagnostics()` (async, non-blocking):
+1. DNS resolve4 of `SMTP_HOST` — logs resolved IPs or error code
+2. `transporter.verify()` with timing — logs `elapsedMs` and error code
+
+`/api/smtp-test` runs the same verify on demand and returns safe JSON including `elapsedMs` and DNS result.
+
+If Render SMTP times out, swap the body of `sendEmail()` to use Resend/Brevo — no other code changes needed.
 
 ## PWA
 

@@ -430,16 +430,24 @@ async function loadReminders() {
 
 // ── Actions ───────────────────────────────────────────────────
 
+function smtpUserMessage(data) {
+  if (data.code === 'CONNECTION_ERROR') return 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.';
+  if (data.code === 'AUTH_ERROR')       return 'Gmail prijava ni uspela. Preveri App Password.';
+  if (data.code === 'DNS_ERROR')        return 'SMTP strežnika ni mogoče najti.';
+  if (data.code === 'MISSING_CONFIG')   return 'Manjkajo email nastavitve v Render Environment Variables.';
+  return data.message || 'Pošiljanje ni uspelo.';
+}
+
 async function sendNow(id, btn) {
   btn.disabled = true;
   btn.textContent = 'Pošiljam…';
   try {
     const res  = await fetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || data.error || 'Napaka');
+    if (!res.ok) throw new Error(smtpUserMessage(data));
     await loadReminders();
   } catch (err) {
-    alert(err.message || 'Pošiljanje ni uspelo. Preveri Gmail nastavitve.');
+    alert(err.message || 'Pošiljanje ni uspelo.');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji zdaj';
@@ -524,10 +532,10 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
       body: JSON.stringify({ email: email || undefined }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || data.error || 'Napaka');
+    if (!res.ok) throw new Error(smtpUserMessage(data));
     showMessage(msg, '✓ Testni email poslan! Preveri Gmail.', 'success');
   } catch (err) {
-    showMessage(msg, err.message || 'Gmail napaka. Preveri nastavitve.', 'error');
+    showMessage(msg, err.message || 'Pošiljanje ni uspelo.', 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji testni Gmail';
