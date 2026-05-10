@@ -163,6 +163,10 @@ Priporočena rešitev je **Resend** (brezplačno, 3000 emailov/mesec, pošilja p
 | `MAIL_FROM` | `onboarding@resend.dev` ali tvoja domena |
 | `DEFAULT_REMINDER_EMAIL` | `tvoj.email@gmail.com` |
 | `NODE_ENV` | `production` |
+| `APP_ACCESS_CODE` | `tvoja-tajna-koda` (ščiti javno URL-jo) |
+
+> `APP_ACCESS_CODE` je enostavna zaščita pred naključnimi obiskovalci na javnem Render URL-ju.  
+> Hraniti zasebno — zamenjaj, če jo po nesreči deliš. To ni polno prijav sistema.
 
 > `MAIL_FROM=onboarding@resend.dev` je Resendov testni naslov — deluje brez lastne domene.  
 > Za lastno domeno (npr. `marusa@tvoja-domena.si`) je treba domeno verificirati na resend.com.

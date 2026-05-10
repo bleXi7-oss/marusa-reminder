@@ -20,11 +20,24 @@
 </head>
 <body>
 
+  <!-- Lock screen — shown when APP_ACCESS_CODE is set and user is not unlocked -->
+  <div id="lockScreen" class="lock-screen hidden">
+    <div class="lock-card">
+      <div class="lock-logo">🌸</div>
+      <h1 class="lock-title">Maruša Reminder</h1>
+      <p class="lock-subtitle">Vpiši kodo za dostop</p>
+      <input type="password" id="lockCodeInput" placeholder="••••••••" autocomplete="off" />
+      <button id="lockSubmitBtn" class="btn-primary">Odpri</button>
+      <div id="lockMessage" class="message hidden"></div>
+    </div>
+  </div>
+
   <div class="app">
 
     <header>
       <h1>🌸 Maruša Reminder</h1>
       <p class="subtitle">Ne pozabi follow-upa.</p>
+      <button id="lockBtn" class="btn-lock hidden" title="Zakleni aplikacijo">Zakleni aplikacijo</button>
     </header>
 
     <main>
@@ -42,8 +55,16 @@
         <p><strong>Ročni način</strong> — Vnesi naslov, datum in email ročno.</p>
         <p><strong>Opomni me prej</strong> — Nastavlja, koliko pred rokom boš opomnik dobil/a.</p>
         <p><strong>Razberi opomnik</strong> — Pripravi podatke iz besedila. Nič se še ne shrani.</p>
-        <p><strong>Shrani opomnik</strong> — Shrani in ob nastavljenem času pošlje email na tvoj Gmail.</p>
+        <p><strong>Shrani opomnik</strong> — Shrani in ob nastavljenem času pošlje email.</p>
         <div class="help-note">Opomniki delujejo samo, ko Node.js strežnik teče (<code>npm start</code>).</div>
+        <div class="help-errors">
+          <div class="help-errors-title">Napake / kaj preveriti</div>
+          <div class="help-error-row"><span class="help-err-code">ERR-001</span> Napačna koda za dostop — preveri APP_ACCESS_CODE v Render.</div>
+          <div class="help-error-row"><span class="help-err-code">ERR-002/003</span> Resend ne deluje — preveri RESEND_API_KEY in MAIL_FROM v Render.</div>
+          <div class="help-error-row"><span class="help-err-code">ERR-010</span> App ni posodobljena — Render → Manual Deploy.</div>
+          <div class="help-error-row"><span class="help-err-code">ERR-012</span> App se zbuja (Render Free) — počakaj 30–60 sekund.</div>
+          <div class="help-error-row"><span class="help-err-code">ERR-014</span> Datum ni bil prepoznan — izberi datum ročno.</div>
+        </div>
       </div>
 
       <!-- Smart Paste section -->

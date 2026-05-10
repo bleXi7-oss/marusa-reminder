@@ -506,10 +506,127 @@ input[type="checkbox"] {
   font-style: italic;
 }
 
+/* ── Lock Screen ───────────────────────────────────────────── */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+}
+
+.lock-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 40px 32px 32px;
+  box-shadow: var(--shadow);
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+}
+
+.lock-logo { font-size: 2.6rem; margin-bottom: 12px; line-height: 1; }
+
+.lock-title {
+  font-family: 'Lora', serif;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.lock-subtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-bottom: 20px;
+  font-family: 'Lora', serif;
+  font-style: italic;
+}
+
+.lock-card input {
+  text-align: center;
+  letter-spacing: 0.12em;
+  margin-bottom: 12px;
+}
+
+.lock-card .btn-primary { width: 100%; }
+
+/* ── Lock button in header ─────────────────────────────────── */
+.btn-lock {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s;
+}
+
+.btn-lock:hover { color: var(--accent); }
+
+/* ── Field error state ─────────────────────────────────────── */
+input.field-error, textarea.field-error {
+  border-color: var(--accent) !important;
+  background: var(--accent-lt) !important;
+}
+
+/* ── Error action line in messages ─────────────────────────── */
+.msg-action {
+  margin-top: 5px;
+  font-size: 0.82em;
+  opacity: 0.85;
+}
+
+/* ── Help card errors section ──────────────────────────────── */
+.help-errors {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.help-errors-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.help-error-row {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 5px;
+  line-height: 1.4;
+}
+
+.help-error-row:last-child { margin-bottom: 0; }
+
+.help-err-code {
+  font-family: monospace;
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }
   .card { padding: 20px 16px; }
   .form-actions { flex-direction: column; }
   .btn-primary { min-width: unset; }
+  .lock-card { padding: 32px 20px 24px; }
 }

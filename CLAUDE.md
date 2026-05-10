@@ -94,18 +94,34 @@ Key functions:
 
 ## API endpoints
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/api/reminders` | List all |
-| POST | `/api/reminders` | Create (`{title, description?, remindAt, email}`) |
-| DELETE | `/api/reminders/:id` | Delete |
-| POST | `/api/reminders/:id/send-now` | Force-send — returns `{ok, message, code}` |
-| POST | `/api/test-email` | Test Gmail (`{email?}`) — returns `{ok, message, code}` |
-| GET | `/api/email-status` | Safe SMTP config check (no secrets) |
-| GET | `/api/smtp-test` | Live SMTP verify + DNS probe + `elapsedMs` (no secrets) |
+All routes except `/api/health` and `/api/auth` require `X-App-Code` header when `APP_ACCESS_CODE` is set. Returns `ERR-001` + HTTP 401 if unauthorized.
 
-Email endpoints return `{ ok: true, message }` on success and `{ ok: false, message, code }` on error.
-Error codes: `AUTH_ERROR`, `CONNECTION_ERROR`, `DNS_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| GET | `/api/health` | No | App status + `protected` flag + `defaultEmail` |
+| GET | `/api/auth` | Yes | Verify access code (used by frontend unlock) |
+| GET | `/api/reminders` | Yes | List all |
+| POST | `/api/reminders` | Yes | Create (`{title, description?, remindAt, email}`) |
+| DELETE | `/api/reminders/:id` | Yes | Delete |
+| POST | `/api/reminders/:id/send-now` | Yes | Force-send |
+| POST | `/api/test-email` | Yes | Test email (`{email?}`) |
+| GET | `/api/email-status` | Yes | Safe provider config (no secrets) |
+| GET | `/api/smtp-test` | Yes | Live Gmail SMTP verify + DNS + `elapsedMs` |
+
+All error responses: `{ ok: false, code: "ERR-XXX", message: "...", action: "..." }`.
+
+Error code registry (ERR-001 through ERR-015) defined in `ERRORS` object in `server.js`. `makeError(code, override?)` builds the response. `smtpErrorMessage(err)` maps nodemailer/Resend errors to ERR codes.
+
+## Access protection
+
+`APP_ACCESS_CODE` env var enables simple access lock. Not full auth — single shared code.
+
+- Frontend calls `/api/health` on init to check `protected` flag.
+- If protected and no stored code → lock screen shown.
+- All `apiFetch()` calls include `X-App-Code: <stored code>` header.
+- 401 response → clear stored code + show lock screen again.
+- Lock stored in `localStorage('marusa_code')`.
+- "Zakleni aplikacijo" button clears stored code.
 
 ## Email provider architecture
 
@@ -117,13 +133,11 @@ Two providers supported:
 
 `checkEmailConfig()` validates the active provider's required env vars before each send attempt.
 
-`smtpErrorMessage(err)` maps errors to typed codes: `RESEND_ERROR`, `MISSING_RESEND_CONFIG`, `AUTH_ERROR`, `CONNECTION_ERROR`, `DNS_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
+`smtpErrorMessage(err)` maps errors to ERR codes: `ERR-003` (Resend), `ERR-013` (SMTP blocked/auth), `ERR-015` (unknown).
 
-Startup runs `runSmtpDiagnostics()` (async, non-blocking) — skipped when `EMAIL_PROVIDER=resend`:
-1. DNS resolve4 of `SMTP_HOST` — logs resolved IPs or error code
-2. `transporter.verify()` with timing — logs `elapsedMs` and error code
+Startup runs `runSmtpDiagnostics()` (async, non-blocking) — skipped when `EMAIL_PROVIDER=resend`.
 
-`/api/smtp-test` runs the same Gmail SMTP verify on demand — only useful when not using Resend.
+`/api/smtp-test` runs Gmail SMTP verify on demand — only useful when not using Resend.
 
 `/api/email-status` returns safe config info: `provider`, `hasResendApiKey`, `hasMailFrom`, `gmailSmtpAvailable`.
 

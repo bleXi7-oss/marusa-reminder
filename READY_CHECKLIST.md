@@ -23,13 +23,22 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 - [ ] Testni email poslan (gumb "Pošlji testni Gmail")
 - [ ] Email prispel v Gmail mapo
 
+## Dostop (APP_ACCESS_CODE)
+
+- [ ] Če `APP_ACCESS_CODE` je nastavljen → ob odprtju se prikaže zaklenjen zaslon
+- [ ] Napačna koda → sporoči ERR-001
+- [ ] Pravilna koda → odklene aplikacijo
+- [ ] Opomniki se naložijo šele po odklenjenju
+- [ ] Gumb "Zakleni aplikacijo" (v headerju) počisti kodo in vrne na zaklenjen zaslon
+- [ ] API klici brez kode vrnejo HTTP 401
+
 ## Pametni način
 
 - [ ] Paste teksta z datumom → Maruša prepozna datum
 - [ ] Prikaže se predogled (Opravilo / Dogodek / Opomnik)
 - [ ] Gumb "Shrani opomnik" v predogledu shrani opomnik
 - [ ] Gumb "Uredi" zapusti predogled in sprosti polja
-- [ ] Če datuma ni → sporoči "Datuma nisem prepoznala 😅" in odpre ročni vnos
+- [ ] Če datuma ni → sporoči ERR-014 in odpre ročni vnos
 - [ ] Prepoznavanje poslovnih ključnih besed deluje (račun, plačilo, ponudba...)
 
 ## Ročni način
@@ -71,9 +80,11 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 - [ ] Render env var `MAIL_FROM` nastavljen (`onboarding@resend.dev` ali verificirana domena)
 - [ ] Render env var `DEFAULT_REMINDER_EMAIL` nastavljen
 - [ ] Render env var `NODE_ENV=production` nastavljen
-- [ ] `/api/email-status` vrne `"provider": "resend"` in `"hasResendApiKey": true`
+- [ ] Render env var `APP_ACCESS_CODE` nastavljen (ščiti javni URL)
+- [ ] `/api/health` vrne `"protected": true`
+- [ ] `/api/email-status` (z `X-App-Code` headerjem) vrne `"provider": "resend"` in `"hasResendApiKey": true`
 - [ ] Testni email poslan prek Render (`Pošlji testni Gmail`)
-- [ ] Napake v UI prikazujejo slovensko sporočilo (RESEND_ERROR / MISSING_RESEND_CONFIG)
+- [ ] Napake v UI prikazujejo ERR kodo + razlago + kaj preveriti
 - [ ] Startup log prikazuje `[SMTP diagnostics] Preskočeno — EMAIL_PROVIDER=resend.`
 
 ## Render deployment — Gmail SMTP (samo lokalno / fallback)

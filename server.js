@@ -1,16 +1,15 @@
 require('dotenv').config();
-const express   = require('express');
+const express    = require('express');
 const nodemailer = require('nodemailer');
-const dns       = require('dns');
-const fs        = require('fs');
-const path      = require('path');
-const crypto    = require('crypto');
+const dns        = require('dns');
+const fs         = require('fs');
+const path       = require('path');
+const crypto     = require('crypto');
 
 const app       = express();
 const PORT      = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'reminders.json');
 
-// SMTP config — defaults to Gmail port 465 (TLS)
 const SMTP_HOST   = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10);
 const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
@@ -20,18 +19,55 @@ const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Log safe config on startup (no secrets)
-console.log('[Email config]', JSON.stringify({
-  provider:     process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'gmail-smtp',
-  hasResendKey: !!process.env.RESEND_API_KEY,
-  smtpHost:     SMTP_HOST,
-  smtpPort:     SMTP_PORT,
-  smtpSecure:   SMTP_SECURE,
-  hasUser:      !!process.env.GMAIL_USER,
-  hasPassword:  !!process.env.GMAIL_APP_PASSWORD,
-  hasMailFrom:  !!process.env.MAIL_FROM,
-  hasDefaultTo: !!process.env.DEFAULT_REMINDER_EMAIL,
+console.log('[Startup config]', JSON.stringify({
+  provider:      process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'gmail-smtp',
+  hasResendKey:  !!process.env.RESEND_API_KEY,
+  hasMailFrom:   !!process.env.MAIL_FROM,
+  hasDefaultTo:  !!process.env.DEFAULT_REMINDER_EMAIL,
+  hasAccessCode: !!process.env.APP_ACCESS_CODE,
+  smtpHost:      SMTP_HOST,
+  smtpPort:      SMTP_PORT,
+  smtpSecure:    SMTP_SECURE,
+  hasUser:       !!process.env.GMAIL_USER,
+  hasPassword:   !!process.env.GMAIL_APP_PASSWORD,
 }));
+
+// ── Error registry ────────────────────────────────────────────
+
+const ERRORS = {
+  'ERR-001': { message: 'Dostop zavrnjen.',                      action: 'Preveri APP_ACCESS_CODE v Render Environment Variables.' },
+  'ERR-002': { message: 'Resend API key manjka.',                action: 'Render → Environment → dodaj RESEND_API_KEY.' },
+  'ERR-003': { message: 'Pošiljanje prek Resend ni uspelo.',     action: 'Preveri RESEND_API_KEY, MAIL_FROM in Render logs.' },
+  'ERR-004': { message: 'MAIL_FROM ni nastavljen.',              action: 'Render → Environment → nastavi MAIL_FROM.' },
+  'ERR-005': { message: 'DEFAULT_REMINDER_EMAIL ni nastavljen.', action: 'Render → Environment → nastavi DEFAULT_REMINDER_EMAIL.' },
+  'ERR-006': { message: 'Opomnik ni bil najden.',                action: 'Osveži aplikacijo.' },
+  'ERR-007': { message: 'Opomnik ni bil shranjen.',              action: 'Preveri Render logs in shranjevanje podatkov.' },
+  'ERR-008': { message: 'Email manjka ali ni veljaven.',         action: 'Vpiši email preden shraniš ali pošlješ opomnik.' },
+  'ERR-009': { message: 'Datum manjka ali je neveljaven.',       action: 'Izberi pravilen datum in uro.' },
+  'ERR-010': { message: 'Render/redeploy problem.',              action: 'Render → Manual Deploy → Deploy latest commit.' },
+  'ERR-011': { message: 'GitHub ni posodobljen.',                action: 'Zaženi git status in git push.' },
+  'ERR-012': { message: 'App spi na Render Free.',               action: 'Počakaj 30–60 sekund in osveži.' },
+  'ERR-013': { message: 'Gmail SMTP blokiran.',                  action: 'Uporabi Resend ponudnika, ne Gmail SMTP.' },
+  'ERR-014': { message: 'Parser ni našel datuma.',               action: 'Izberi datum ročno.' },
+  'ERR-015': { message: 'Nepričakovana napaka.',                 action: 'Preveri Render logs.' },
+};
+
+function makeError(code, override = {}) {
+  const e = ERRORS[code] || ERRORS['ERR-015'];
+  return { ok: false, code, message: e.message, action: e.action, ...override };
+}
+
+// ── Access control ────────────────────────────────────────────
+
+function requireAuth(req, res, next) {
+  if (!process.env.APP_ACCESS_CODE) return next();
+  if (req.headers['x-app-code'] === process.env.APP_ACCESS_CODE) return next();
+  return res.status(401).json(makeError('ERR-001'));
+}
+
+// ── Email validation ──────────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Data helpers ──────────────────────────────────────────────
 
@@ -97,30 +133,20 @@ async function sendEmail({ to, from, subject, text }) {
 
 function checkEmailConfig() {
   if (process.env.EMAIL_PROVIDER === 'resend') {
-    if (!process.env.RESEND_API_KEY) {
-      return {
-        message: 'Manjkajo Resend nastavitve v Render Environment Variables.',
-        code:    'MISSING_RESEND_CONFIG',
-      };
-    }
+    if (!process.env.RESEND_API_KEY) return makeError('ERR-002');
     return null;
   }
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    return {
-      message: 'Manjkajo email nastavitve v Render Environment Variables.',
-      code:    'MISSING_CONFIG',
-    };
+    return makeError('ERR-015', {
+      message: 'Manjkajo Gmail SMTP nastavitve.',
+      action:  'Nastavi GMAIL_USER in GMAIL_APP_PASSWORD v .env.',
+    });
   }
   return null;
 }
 
 function smtpErrorMessage(err) {
-  if (err.resendError) {
-    return {
-      message: 'Pošiljanje prek Resend ni uspelo. Preveri RESEND_API_KEY in MAIL_FROM.',
-      code:    'RESEND_ERROR',
-    };
-  }
+  if (err.resendError) return makeError('ERR-003');
 
   const code = (err.code || '').toUpperCase();
   const msg  = (err.message || '').toLowerCase();
@@ -133,11 +159,17 @@ function smtpErrorMessage(err) {
     msg.includes('authentication failed') ||
     msg.includes('authentication')
   ) {
-    return { message: 'Gmail prijava ni uspela. Preveri Gmail App Password.', code: 'AUTH_ERROR' };
+    return makeError('ERR-015', {
+      message: 'Gmail prijava ni uspela.',
+      action:  'Preveri Gmail App Password v .env.',
+    });
   }
 
   if (code === 'ENOTFOUND' || code === 'EHOSTUNREACH') {
-    return { message: 'SMTP strežnika ni mogoče najti. Preveri SMTP_HOST nastavitev.', code: 'DNS_ERROR' };
+    return makeError('ERR-013', {
+      message: 'SMTP strežnika ni mogoče najti.',
+      action:  'Preveri SMTP_HOST nastavitev.',
+    });
   }
 
   if (
@@ -149,10 +181,10 @@ function smtpErrorMessage(err) {
     msg.includes('timeout') ||
     msg.includes('connect')
   ) {
-    return { message: 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.', code: 'CONNECTION_ERROR' };
+    return makeError('ERR-013');
   }
 
-  return { message: 'Pošiljanje ni uspelo. Preveri Render logs.', code: 'UNKNOWN_ERROR' };
+  return makeError('ERR-015');
 }
 
 function formatDate(dateStr) {
@@ -189,7 +221,6 @@ async function sendReminderEmail(reminder) {
 }
 
 // ── Startup SMTP diagnostics ──────────────────────────────────
-// Runs async after server start — does not block HTTP serving.
 
 async function runSmtpDiagnostics() {
   if (process.env.EMAIL_PROVIDER === 'resend') {
@@ -197,7 +228,6 @@ async function runSmtpDiagnostics() {
     return;
   }
 
-  // Step 1: DNS resolution
   try {
     const addresses = await new Promise((resolve, reject) =>
       dns.resolve4(SMTP_HOST, (err, addrs) => err ? reject(err) : resolve(addrs))
@@ -211,7 +241,6 @@ async function runSmtpDiagnostics() {
     }));
   }
 
-  // Step 2: Connection verify (skipped if env vars missing)
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     console.log('[SMTP verify] Preskočeno — manjkajo GMAIL_USER ali GMAIL_APP_PASSWORD.');
     return;
@@ -271,17 +300,27 @@ async function checkAndSendReminders() {
   if (changed) saveReminders(reminders);
 }
 
-// Run on startup, then every 60 seconds
 checkAndSendReminders();
 setInterval(checkAndSendReminders, 60 * 1000);
 
 // ── API Routes ────────────────────────────────────────────────
 
+// Unprotected: returns app status for frontend init (no secrets)
 app.get('/api/health', (req, res) => {
+  res.json({
+    ok:           true,
+    protected:    !!process.env.APP_ACCESS_CODE,
+    defaultEmail: process.env.DEFAULT_REMINDER_EMAIL || null,
+  });
+});
+
+// Protected: verifies access code (used by frontend unlock flow)
+app.get('/api/auth', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/email-status', (req, res) => {
+// Protected: safe SMTP/provider config check
+app.get('/api/email-status', requireAuth, (req, res) => {
   res.json({
     provider:                process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'gmail-smtp',
     hasResendApiKey:         !!process.env.RESEND_API_KEY,
@@ -294,15 +333,11 @@ app.get('/api/email-status', (req, res) => {
   });
 });
 
-// Diagnostic endpoint — runs transporter.verify() and reports result.
-// Use this to confirm whether Render can reach Gmail SMTP at all.
-app.get('/api/smtp-test', async (req, res) => {
+// Protected: live SMTP diagnostic (only useful when using Gmail fallback)
+app.get('/api/smtp-test', requireAuth, async (req, res) => {
   const configErr = checkEmailConfig();
-  if (configErr) {
-    return res.json({ ok: false, ...configErr, elapsedMs: 0 });
-  }
+  if (configErr) return res.json({ ok: false, ...configErr, elapsedMs: 0 });
 
-  // DNS probe
   let dnsResult = null;
   try {
     dnsResult = await new Promise((resolve, reject) =>
@@ -317,49 +352,26 @@ app.get('/api/smtp-test', async (req, res) => {
   try {
     await t.verify();
     const elapsedMs = Date.now() - start;
-    console.log('[smtp-test endpoint] OK', JSON.stringify({ smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, secure: SMTP_SECURE, elapsedMs }));
-    res.json({
-      ok:         true,
-      message:    'SMTP povezava uspešna.',
-      smtpHost:   SMTP_HOST,
-      smtpPort:   SMTP_PORT,
-      smtpSecure: SMTP_SECURE,
-      dns:        dnsResult,
-      elapsedMs,
-    });
+    console.log('[smtp-test] OK', JSON.stringify({ smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, secure: SMTP_SECURE, elapsedMs }));
+    res.json({ ok: true, message: 'SMTP povezava uspešna.', smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, smtpSecure: SMTP_SECURE, dns: dnsResult, elapsedMs });
   } catch (err) {
     const elapsedMs = Date.now() - start;
-    console.error('[smtp-test endpoint] Napaka:', JSON.stringify({
-      smtpHost:  SMTP_HOST,
-      smtpPort:  SMTP_PORT,
-      secure:    SMTP_SECURE,
-      errCode:   err.code,
-      errMsg:    err.message,
-      elapsedMs,
-    }));
-    const errRes = smtpErrorMessage(err);
-    res.json({
-      ok:         false,
-      ...errRes,
-      smtpHost:   SMTP_HOST,
-      smtpPort:   SMTP_PORT,
-      smtpSecure: SMTP_SECURE,
-      dns:        dnsResult,
-      elapsedMs,
-    });
+    console.error('[smtp-test] Napaka:', JSON.stringify({ smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, secure: SMTP_SECURE, errCode: err.code, errMsg: err.message, elapsedMs }));
+    res.json({ ok: false, ...smtpErrorMessage(err), smtpHost: SMTP_HOST, smtpPort: SMTP_PORT, smtpSecure: SMTP_SECURE, dns: dnsResult, elapsedMs });
   }
 });
 
-app.get('/api/reminders', (req, res) => {
+app.get('/api/reminders', requireAuth, (req, res) => {
   res.json(loadReminders());
 });
 
-app.post('/api/reminders', (req, res) => {
+app.post('/api/reminders', requireAuth, (req, res) => {
   const { title, description, remindAt, email } = req.body;
 
-  if (!title || !remindAt || !email) {
-    return res.status(400).json({ error: 'Naslov, čas in email so obvezni.' });
-  }
+  if (!title)    return res.status(400).json(makeError('ERR-007', { message: 'Naslov opomnika je obvezen.' }));
+  if (!remindAt) return res.status(400).json(makeError('ERR-009'));
+  if (!email)    return res.status(400).json(makeError('ERR-008', { message: 'Email za opomnik manjka.', action: 'Vpiši email preden shraniš opomnik.' }));
+  if (!EMAIL_RE.test(email)) return res.status(400).json(makeError('ERR-008', { message: 'Email ni veljaven.', action: 'Vpiši pravilen email naslov.' }));
 
   const reminder = {
     id:          crypto.randomUUID(),
@@ -372,37 +384,37 @@ app.post('/api/reminders', (req, res) => {
     createdAt:   new Date().toISOString(),
   };
 
-  const reminders = loadReminders();
-  reminders.push(reminder);
-  saveReminders(reminders);
-
-  res.json(reminder);
+  try {
+    const reminders = loadReminders();
+    reminders.push(reminder);
+    saveReminders(reminders);
+    res.json(reminder);
+  } catch (err) {
+    console.error('Napaka shranjevanja:', err.message);
+    res.status(500).json(makeError('ERR-007'));
+  }
 });
 
-app.delete('/api/reminders/:id', (req, res) => {
+app.delete('/api/reminders/:id', requireAuth, (req, res) => {
   const reminders = loadReminders();
   const filtered  = reminders.filter(r => r.id !== req.params.id);
 
   if (filtered.length === reminders.length) {
-    return res.status(404).json({ error: 'Opomnik ni bil najden.' });
+    return res.status(404).json(makeError('ERR-006'));
   }
 
   saveReminders(filtered);
   res.json({ ok: true });
 });
 
-app.post('/api/reminders/:id/send-now', async (req, res) => {
+app.post('/api/reminders/:id/send-now', requireAuth, async (req, res) => {
   const reminders = loadReminders();
   const reminder  = reminders.find(r => r.id === req.params.id);
 
-  if (!reminder) {
-    return res.status(404).json({ ok: false, message: 'Opomnik ni bil najden.', code: 'NOT_FOUND' });
-  }
+  if (!reminder) return res.status(404).json(makeError('ERR-006'));
 
   const configErr = checkEmailConfig();
-  if (configErr) {
-    return res.status(400).json({ ok: false, ...configErr });
-  }
+  if (configErr) return res.status(400).json(configErr);
 
   try {
     await sendReminderEmail(reminder);
@@ -412,51 +424,40 @@ app.post('/api/reminders/:id/send-now', async (req, res) => {
     res.json({ ok: true, message: 'Email poslan.' });
   } catch (err) {
     console.error('Napaka pošiljanja:', JSON.stringify({
-      smtpHost:  SMTP_HOST,
-      smtpPort:  SMTP_PORT,
-      secure:    SMTP_SECURE,
-      hasUser:   !!process.env.GMAIL_USER,
-      hasPass:   !!process.env.GMAIL_APP_PASSWORD,
+      provider:  process.env.EMAIL_PROVIDER || 'gmail-smtp',
       recipient: reminder.email,
       errCode:   err.code,
       errMsg:    err.message,
     }));
-    res.status(500).json({ ok: false, ...smtpErrorMessage(err) });
+    res.status(500).json(smtpErrorMessage(err));
   }
 });
 
-app.post('/api/test-email', async (req, res) => {
+app.post('/api/test-email', requireAuth, async (req, res) => {
   const to = req.body.email || process.env.DEFAULT_REMINDER_EMAIL;
 
-  if (!to) {
-    return res.status(400).json({ ok: false, message: 'Manjka email naslov.', code: 'MISSING_EMAIL' });
-  }
+  if (!to) return res.status(400).json(makeError('ERR-008', { message: 'Manjka email naslov.' }));
+  if (!EMAIL_RE.test(to)) return res.status(400).json(makeError('ERR-008', { message: 'Email naslov ni veljaven.' }));
 
   const configErr = checkEmailConfig();
-  if (configErr) {
-    return res.status(400).json({ ok: false, ...configErr });
-  }
+  if (configErr) return res.status(400).json(configErr);
 
   try {
     await sendEmail({
       from:    `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
       to,
       subject: 'Testni email — Maruša Reminder',
-      text:    'Hej 👋\n\nGmail povezava deluje! Maruša Reminder je pripravljena.\n\n— Maruša Reminder',
+      text:    'Hej 👋\n\nEmail pošiljanje deluje! Maruša Reminder je pripravljena.\n\n— Maruša Reminder',
     });
     res.json({ ok: true, message: 'Email poslan.' });
   } catch (err) {
     console.error('Test email napaka:', JSON.stringify({
-      smtpHost:  SMTP_HOST,
-      smtpPort:  SMTP_PORT,
-      secure:    SMTP_SECURE,
-      hasUser:   !!process.env.GMAIL_USER,
-      hasPass:   !!process.env.GMAIL_APP_PASSWORD,
+      provider:  process.env.EMAIL_PROVIDER || 'gmail-smtp',
       recipient: to,
       errCode:   err.code,
       errMsg:    err.message,
     }));
-    res.status(500).json({ ok: false, ...smtpErrorMessage(err) });
+    res.status(500).json(smtpErrorMessage(err));
   }
 });
 
@@ -464,6 +465,5 @@ app.post('/api/test-email', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`\n🌸 Maruša Reminder teče na http://localhost:${PORT}\n`);
-  // Run SMTP diagnostics after server is up — non-blocking
   runSmtpDiagnostics().catch(() => {});
 });

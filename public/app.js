@@ -20,10 +20,179 @@ function statusLabel(status) {
   return                           { text: 'Čaka',     cls: 'badge-waiting' };
 }
 
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Rich message: accepts plain string or { code, message, action } object
 function showMessage(el, text, type) {
-  el.textContent = text;
+  if (text && typeof text === 'object') {
+    el.innerHTML =
+      `<strong>${escHtml(text.code)}: ${escHtml(text.message)}</strong>` +
+      (text.action ? `<div class="msg-action">Kaj preveriti: ${escHtml(text.action)}</div>` : '');
+  } else {
+    el.textContent = text;
+  }
   el.className = `message ${type}`;
-  setTimeout(() => { el.className = 'message hidden'; }, 4500);
+  setTimeout(() => { el.className = 'message hidden'; }, 5500);
+}
+
+// ── Access control ────────────────────────────────────────────
+
+const CODE_KEY = 'marusa_code';
+
+function getStoredCode() {
+  return localStorage.getItem(CODE_KEY) || '';
+}
+
+// Wrapper for all /api/ calls — injects X-App-Code header when present
+function apiFetch(url, options = {}) {
+  const code = getStoredCode();
+  const headers = { ...options.headers };
+  if (code) headers['X-App-Code'] = code;
+  return fetch(url, { ...options, headers });
+}
+
+function showLockScreen(message) {
+  document.getElementById('lockScreen').classList.remove('hidden');
+  document.getElementById('lockCodeInput').value = '';
+  if (message) {
+    showMessage(document.getElementById('lockMessage'), message, 'error');
+  } else {
+    document.getElementById('lockMessage').className = 'message hidden';
+  }
+  setTimeout(() => document.getElementById('lockCodeInput').focus(), 100);
+}
+
+function hideLockScreen() {
+  document.getElementById('lockScreen').classList.add('hidden');
+}
+
+function handleUnauthorized() {
+  localStorage.removeItem(CODE_KEY);
+  showLockScreen({ code: 'ERR-001', message: 'Dostop zavrnjen.', action: 'Vpiši kodo za dostop.' });
+}
+
+// Checks /api/health to decide whether to show lock screen.
+// Returns true if the app is ready to use.
+async function initAuth() {
+  let data;
+  try {
+    const res = await fetch('/api/health');
+    data = await res.json();
+  } catch {
+    return true; // if health check fails, proceed without lock
+  }
+
+  // Prefill default email if not already saved
+  if (data.defaultEmail && !localStorage.getItem(EMAIL_KEY)) {
+    document.getElementById('email').value = data.defaultEmail;
+  }
+
+  if (!data.protected) {
+    document.getElementById('lockBtn').classList.add('hidden');
+    return true;
+  }
+
+  // Show lock button (app is protected)
+  document.getElementById('lockBtn').classList.remove('hidden');
+
+  if (!getStoredCode()) {
+    showLockScreen();
+    return false;
+  }
+
+  // Verify stored code against the protected endpoint
+  try {
+    const res = await apiFetch('/api/auth');
+    if (res.status === 401) {
+      handleUnauthorized();
+      return false;
+    }
+  } catch {
+    // Network error — proceed optimistically, API calls will fail if needed
+  }
+
+  return true;
+}
+
+// Lock screen submit
+document.getElementById('lockSubmitBtn').addEventListener('click', async () => {
+  const code = document.getElementById('lockCodeInput').value.trim();
+  const msg  = document.getElementById('lockMessage');
+  const btn  = document.getElementById('lockSubmitBtn');
+
+  if (!code) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Preverjam…';
+
+  try {
+    const res = await fetch('/api/auth', { headers: { 'X-App-Code': code } });
+    if (res.ok) {
+      localStorage.setItem(CODE_KEY, code);
+      hideLockScreen();
+      await loadReminders();
+    } else {
+      showMessage(msg, { code: 'ERR-001', message: 'Napačna koda za dostop.', action: 'Preveri APP_ACCESS_CODE v Render Environment Variables.' }, 'error');
+      document.getElementById('lockCodeInput').focus();
+    }
+  } catch {
+    showMessage(msg, 'Napaka pri preverjanju. Poskusi znova.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Odpri';
+  }
+});
+
+document.getElementById('lockCodeInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('lockSubmitBtn').click();
+});
+
+// "Zakleni aplikacijo" button
+document.getElementById('lockBtn').addEventListener('click', () => {
+  localStorage.removeItem(CODE_KEY);
+  showLockScreen();
+});
+
+// ── Email validation ──────────────────────────────────────────
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateEmail(email, msgEl) {
+  if (!email) {
+    highlightField('email');
+    showMessage(msgEl, { code: 'ERR-008', message: 'Email za opomnik manjka.', action: 'Vpiši email preden shraniš ali pošlješ opomnik.' }, 'error');
+    return false;
+  }
+  if (!EMAIL_RE.test(email)) {
+    highlightField('email');
+    showMessage(msgEl, { code: 'ERR-008', message: 'Email ni veljaven.', action: 'Vpiši pravilen email naslov.' }, 'error');
+    return false;
+  }
+  return true;
+}
+
+function highlightField(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.add('field-error');
+  el.focus();
+  setTimeout(() => el.classList.remove('field-error'), 3000);
+}
+
+// ── Error display ─────────────────────────────────────────────
+
+// Converts API response data to a display object { code, message, action }
+function apiErrorDisplay(data) {
+  if (data && data.code && data.message) {
+    return { code: data.code, message: data.message, action: data.action || '' };
+  }
+  return data && data.message ? data.message : 'Napaka.';
 }
 
 // ── Smart Reminder Parser ─────────────────────────────────────
@@ -314,7 +483,6 @@ function parseSmartReminderText(text, offset) {
   const title           = extractTitle(text, businessContext);
   const description     = extractDescription(text);
 
-  // Sub-hour relative: "čez pol ure", "čez 30 minut", "in 2 hours" — no offset applied
   const relMins = extractRelativeMinutes(text);
   if (relMins !== null) {
     const now = new Date();
@@ -335,7 +503,6 @@ function parseSmartReminderText(text, offset) {
     };
   }
 
-  // Build event date+time
   const eventDate = new Date(rawDate);
   eventDate.setHours(
     timeResult ? timeResult.hour   : 9,
@@ -365,14 +532,6 @@ function toDatetimeLocalValue(date) {
 }
 
 // ── Render reminders ──────────────────────────────────────────
-
-function escHtml(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function renderCard(r) {
   const status = getStatus(r);
@@ -420,36 +579,35 @@ function renderAll(reminders) {
 
 async function loadReminders() {
   try {
-    const res = await fetch('/api/reminders');
+    const res = await apiFetch('/api/reminders');
+    if (res.status === 401) { handleUnauthorized(); return; }
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     renderAll(await res.json());
   } catch (err) {
-    console.error('Napaka pri nalaganju opomnikov:', err.message);
+    if (err.message !== 'unauthorized') {
+      console.error('Napaka pri nalaganju opomnikov:', err.message);
+    }
   }
 }
 
 // ── Actions ───────────────────────────────────────────────────
 
-function smtpUserMessage(data) {
-  if (data.code === 'RESEND_ERROR')          return 'Pošiljanje prek Resend ni uspelo. Preveri RESEND_API_KEY in MAIL_FROM.';
-  if (data.code === 'MISSING_RESEND_CONFIG') return 'Manjkajo Resend nastavitve v Render Environment Variables.';
-  if (data.code === 'CONNECTION_ERROR')      return 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.';
-  if (data.code === 'AUTH_ERROR')            return 'Gmail prijava ni uspela. Preveri App Password.';
-  if (data.code === 'DNS_ERROR')             return 'SMTP strežnika ni mogoče najti.';
-  if (data.code === 'MISSING_CONFIG')        return 'Manjkajo email nastavitve v Render Environment Variables.';
-  return data.message || 'Pošiljanje ni uspelo.';
-}
-
 async function sendNow(id, btn) {
   btn.disabled = true;
   btn.textContent = 'Pošiljam…';
+  const msg = document.getElementById('formMessage');
   try {
-    const res  = await fetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
+    const res  = await apiFetch(`/api/reminders/${id}/send-now`, { method: 'POST' });
     const data = await res.json();
-    if (!res.ok) throw new Error(smtpUserMessage(data));
+    if (res.status === 401) { handleUnauthorized(); return; }
+    if (!res.ok) {
+      showMessage(msg, apiErrorDisplay(data), 'error');
+      return;
+    }
+    showMessage(msg, '✓ Email poslan!', 'success');
     await loadReminders();
-  } catch (err) {
-    alert(err.message || 'Pošiljanje ni uspelo.');
+  } catch {
+    showMessage(msg, 'Pošiljanje ni uspelo.', 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji zdaj';
@@ -460,7 +618,8 @@ async function deleteReminder(id, btn) {
   if (!confirm('Izbriši ta opomnik?')) return;
   btn.disabled = true;
   try {
-    await fetch(`/api/reminders/${id}`, { method: 'DELETE' });
+    const res = await apiFetch(`/api/reminders/${id}`, { method: 'DELETE' });
+    if (res.status === 401) { handleUnauthorized(); return; }
     await loadReminders();
   } catch {
     btn.disabled = false;
@@ -477,9 +636,14 @@ async function savePendingReminder() {
   const email    = document.getElementById('email').value.trim();
   const msg      = document.getElementById('formMessage');
 
-  if (!title || !remindAt || !email) {
+  if (!title || !remindAt) {
     exitPreviewMode();
-    showMessage(msg, 'Prosim izpolni naslov, datum in email.', 'error');
+    showMessage(msg, 'Prosim izpolni naslov in datum.', 'error');
+    return;
+  }
+
+  if (!validateEmail(email, msg)) {
+    exitPreviewMode();
     return;
   }
 
@@ -490,13 +654,17 @@ async function savePendingReminder() {
   saveBtn.textContent = 'Shranjujem…';
 
   try {
-    const res  = await fetch('/api/reminders', {
-      method: 'POST',
+    const res  = await apiFetch('/api/reminders', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description: desc, remindAt, email }),
+      body:    JSON.stringify({ title, description: desc, remindAt, email }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Napaka');
+    if (res.status === 401) { handleUnauthorized(); return; }
+    if (!res.ok) {
+      showMessage(msg, apiErrorDisplay(data), 'error');
+      return;
+    }
 
     document.getElementById('title').value = '';
     document.getElementById('description').value = '';
@@ -509,8 +677,8 @@ async function savePendingReminder() {
 
     showMessage(msg, '✓ Opomnik shranjen!', 'success');
     await loadReminders();
-  } catch (err) {
-    showMessage(msg, err.message || 'Shranjevanje ni uspelo.', 'error');
+  } catch {
+    showMessage(msg, 'Shranjevanje ni uspelo.', 'error');
   } finally {
     saveBtn.disabled = false;
     saveBtn.textContent = 'Shrani opomnik';
@@ -524,20 +692,26 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
   const msg   = document.getElementById('formMessage');
   const btn   = document.getElementById('testEmailBtn');
 
+  if (!validateEmail(email, msg)) return;
+
   btn.disabled = true;
   btn.textContent = 'Pošiljam…';
 
   try {
-    const res  = await fetch('/api/test-email', {
-      method: 'POST',
+    const res  = await apiFetch('/api/test-email', {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email || undefined }),
+      body:    JSON.stringify({ email }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(smtpUserMessage(data));
+    if (res.status === 401) { handleUnauthorized(); return; }
+    if (!res.ok) {
+      showMessage(msg, apiErrorDisplay(data), 'error');
+      return;
+    }
     showMessage(msg, '✓ Testni email poslan! Preveri Gmail.', 'success');
-  } catch (err) {
-    showMessage(msg, err.message || 'Pošiljanje ni uspelo.', 'error');
+  } catch {
+    showMessage(msg, 'Pošiljanje ni uspelo.', 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Pošlji testni Gmail';
@@ -696,11 +870,10 @@ document.getElementById('smartBtn').addEventListener('click', () => {
 
     const errMsg = warning
       ? warning
-      : 'Datuma nisem prepoznala 😅 Prosim izberi datum ročno.';
+      : { code: 'ERR-014', message: 'Datuma nisem prepoznala.', action: 'Izberi datum ročno.' };
     showMessage(msg, errMsg, 'error');
 
     revealManualForm();
-    // Don't enter preview mode — let user fill in the date
   }
 });
 
@@ -763,7 +936,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 
 // ── Init ──────────────────────────────────────────────────────
 
-(function init() {
+(async function init() {
   // Default reminder time: tomorrow at 09:00
   const d = new Date();
   d.setDate(d.getDate() + 1);
@@ -780,11 +953,19 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 
   // Restore last mode
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
+
+  // Auth check + default email prefill (from /api/health)
+  const ready = await initAuth();
+  if (ready) await loadReminders();
 })();
 
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/service-worker.js').catch(() => {});
 }
 
-loadReminders();
-setInterval(loadReminders, 60 * 1000);
+setInterval(async () => {
+  // Only refresh when the app is unlocked (lock screen not visible)
+  if (document.getElementById('lockScreen').classList.contains('hidden')) {
+    await loadReminders();
+  }
+}, 60 * 1000);
