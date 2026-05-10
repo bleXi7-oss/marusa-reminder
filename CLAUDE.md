@@ -110,15 +110,22 @@ Error codes: `AUTH_ERROR`, `CONNECTION_ERROR`, `DNS_ERROR`, `MISSING_CONFIG`, `U
 ## Email provider architecture
 
 All outgoing email goes through `sendEmail({ to, from, subject, text })` in `server.js`.
-This is the single point to swap providers. Current provider: Gmail SMTP via nodemailer.
 
-Startup runs `runSmtpDiagnostics()` (async, non-blocking):
+Two providers supported:
+- **Resend** (recommended for Render): `EMAIL_PROVIDER=resend` + `RESEND_API_KEY` → uses HTTPS, not SMTP
+- **Gmail SMTP** (local fallback): `GMAIL_USER` + `GMAIL_APP_PASSWORD` via nodemailer
+
+`checkEmailConfig()` validates the active provider's required env vars before each send attempt.
+
+`smtpErrorMessage(err)` maps errors to typed codes: `RESEND_ERROR`, `MISSING_RESEND_CONFIG`, `AUTH_ERROR`, `CONNECTION_ERROR`, `DNS_ERROR`, `MISSING_CONFIG`, `UNKNOWN_ERROR`.
+
+Startup runs `runSmtpDiagnostics()` (async, non-blocking) — skipped when `EMAIL_PROVIDER=resend`:
 1. DNS resolve4 of `SMTP_HOST` — logs resolved IPs or error code
 2. `transporter.verify()` with timing — logs `elapsedMs` and error code
 
-`/api/smtp-test` runs the same verify on demand and returns safe JSON including `elapsedMs` and DNS result.
+`/api/smtp-test` runs the same Gmail SMTP verify on demand — only useful when not using Resend.
 
-If Render SMTP times out, swap the body of `sendEmail()` to use Resend/Brevo — no other code changes needed.
+`/api/email-status` returns safe config info: `provider`, `hasResendApiKey`, `hasMailFrom`, `gmailSmtpAvailable`.
 
 ## PWA
 

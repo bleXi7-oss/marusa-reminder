@@ -151,94 +151,84 @@ files/
 
 ## Namestitev na Render
 
-### Obvezne Environment Variables na Render
+Gmail SMTP **ne deluje zanesljivo na Render free tier** — Render blokira odhodne TCP povezave na portih 465 in 587 (ETIMEDOUT).  
+Priporočena rešitev je **Resend** (brezplačno, 3000 emailov/mesec, pošilja prek HTTPS).
 
-| Spremenljivka | Primer vrednosti |
+### Resend — obvezne Environment Variables na Render
+
+| Spremenljivka | Vrednost |
 |---|---|
-| `GMAIL_USER` | `tvoj.email@gmail.com` |
-| `GMAIL_APP_PASSWORD` | `xxxx xxxx xxxx xxxx` |
-| `MAIL_FROM` | `tvoj.email@gmail.com` |
+| `EMAIL_PROVIDER` | `resend` |
+| `RESEND_API_KEY` | `re_xxx` (iz resend.com) |
+| `MAIL_FROM` | `onboarding@resend.dev` ali tvoja domena |
 | `DEFAULT_REMINDER_EMAIL` | `tvoj.email@gmail.com` |
 | `NODE_ENV` | `production` |
-| `SMTP_HOST` | `smtp.gmail.com` |
-| `SMTP_PORT` | `465` |
-| `SMTP_SECURE` | `true` |
 
-### Korak 1 — Preveri nastavitve
+> `MAIL_FROM=onboarding@resend.dev` je Resendov testni naslov — deluje brez lastne domene.  
+> Za lastno domeno (npr. `marusa@tvoja-domena.si`) je treba domeno verificirati na resend.com.
+
+### Korak 1 — Pridobi Resend API ključ
+
+1. Registriraj se na [resend.com](https://resend.com) (brezplačno)
+2. Ustvari API ključ v API Keys razdelku
+3. Nastavi env var `RESEND_API_KEY=re_xxx` na Render
+
+### Korak 2 — Preveri nastavitve
 
 ```
 https://marusa-reminder.onrender.com/api/email-status
 ```
 
-Vse `has...` vrednosti morajo biti `true`. Če je katerakoli `false`, manjka env var na Render.
+Pričakovan odgovor z Resend:
 
 ```json
 {
-  "provider": "gmail-smtp",
-  "hasGmailUser": true,
-  "hasAppPassword": true,
-  "smtpHost": "smtp.gmail.com",
-  "smtpPort": 465,
-  "smtpSecure": true
+  "provider": "resend",
+  "hasResendApiKey": true,
+  "hasMailFrom": true,
+  "hasDefaultReminderEmail": true,
+  "gmailSmtpAvailable": false
 }
 ```
 
-### Korak 2 — Diagnostičen SMTP test
+### Korak 3 — Pošlji testni email
 
-```
-https://marusa-reminder.onrender.com/api/smtp-test
-```
+Klikni **Pošlji testni Gmail** v aplikaciji — pri `provider: resend` gre prek Resend API.
 
-Ta endpoint poskusi vzpostaviti pravo SMTP TCP povezavo in vrne:
-
-```json
-{ "ok": true, "smtpHost": "smtp.gmail.com", "smtpPort": 465, "elapsedMs": 812 }
-```
-
-ali ob napaki:
-
-```json
-{
-  "ok": false,
-  "code": "CONNECTION_ERROR",
-  "message": "Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.",
-  "smtpPort": 465,
-  "elapsedMs": 30012
-}
-```
-
-Ključne vrednosti `code`:
+Napake:
 
 | code | Pomen |
 |---|---|
-| `CONNECTION_ERROR` | TCP/timeout blokada — Render verjetno blokira SMTP |
-| `AUTH_ERROR` | Napačen App Password ali GMAIL_USER |
-| `DNS_ERROR` | SMTP_HOST ni dosegljiv (napačno ime) |
-| `MISSING_CONFIG` | GMAIL_USER ali GMAIL_APP_PASSWORD nista nastavljena |
+| `RESEND_ERROR` | Napačen API ključ ali MAIL_FROM ni verificiran |
+| `MISSING_RESEND_CONFIG` | `RESEND_API_KEY` ni nastavljen na Render |
 
-### Korak 3 — Če port 465 ne deluje
+---
 
-Preizkusi port 587:
+### Gmail SMTP — samo za lokalno uporabo
+
+Gmail SMTP ostane kot fallback (brez `EMAIL_PROVIDER=resend`).  
+Za lokalno testiranje nastavi v `.env`:
 
 ```
-SMTP_PORT=587
-SMTP_SECURE=false
+GMAIL_USER=tvoj.email@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+MAIL_FROM=tvoj.email@gmail.com
 ```
 
-### Korak 4 — Če SMTP na Render ne deluje
+Diagnostičen SMTP test (samo za Gmail):
 
-Gmail SMTP na Render free tier pogosto ni zanesljiv — Render blokira odhodne SMTP povezave.
-Startup log pokaže `[SMTP verify] Napaka` z `elapsedMs` ~30000 (timeout).
+```
+http://localhost:3001/api/smtp-test
+```
 
-**Priporočen naslednji korak: zamenjaj SMTP z email API ponudnikom.**
+Napake pri Gmail SMTP:
 
-Koda je pripravljena za zamenjavo — v `server.js` je `sendEmail()` funkcija, ki je edino klicno mesto.
-Zamenjava zahteva le spremembo njenega telesa:
-
-- **Resend** (`resend.com`) — `npm install resend`, nastavi `RESEND_API_KEY`
-- **Brevo / Sendgrid / Mailgun** — podobno, brez SMTP
-
-Gmail SMTP deluje zanesljivo samo lokalno ali na hosting ponudnikih, ki ne blokirajo SMTP.
+| code | Pomen |
+|---|---|
+| `CONNECTION_ERROR` | TCP/timeout — Render blokira SMTP |
+| `AUTH_ERROR` | Napačen App Password |
+| `DNS_ERROR` | SMTP_HOST ni dosegljiv |
+| `MISSING_CONFIG` | `GMAIL_USER` ali `GMAIL_APP_PASSWORD` nista nastavljena |
 
 ---
 

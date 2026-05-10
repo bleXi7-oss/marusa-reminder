@@ -64,18 +64,25 @@ Preveri pred prvim zagonom in po vsaki večji spremembi.
 - [ ] Aplikacija deluje kot standalone po namestitvi
 - [ ] Gumb za pomoč (?) prikazuje razlago
 
-## Render deployment
+## Render deployment — Resend (priporočeno)
 
-- [ ] Render env vars nastavljeni: `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `MAIL_FROM`, `DEFAULT_REMINDER_EMAIL`
-- [ ] Render env vars nastavljeni: `NODE_ENV=production`, `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_SECURE=true`
-- [ ] `/api/email-status` vrne vse `has...` vrednosti `true`
-- [ ] `/api/smtp-test` vrne `ok: true` (potrdi TCP dostop do Gmail SMTP)
-- [ ] Render startup log prikazuje `[SMTP DNS]` z resolvanimi IP naslovi
-- [ ] Render startup log prikazuje `[SMTP verify] OK` ali `[SMTP verify] Napaka` z `elapsedMs`
+- [ ] Render env var `EMAIL_PROVIDER=resend` nastavljen
+- [ ] Render env var `RESEND_API_KEY=re_xxx` nastavljen (iz resend.com)
+- [ ] Render env var `MAIL_FROM` nastavljen (`onboarding@resend.dev` ali verificirana domena)
+- [ ] Render env var `DEFAULT_REMINDER_EMAIL` nastavljen
+- [ ] Render env var `NODE_ENV=production` nastavljen
+- [ ] `/api/email-status` vrne `"provider": "resend"` in `"hasResendApiKey": true`
 - [ ] Testni email poslan prek Render (`Pošlji testni Gmail`)
+- [ ] Napake v UI prikazujejo slovensko sporočilo (RESEND_ERROR / MISSING_RESEND_CONFIG)
+- [ ] Startup log prikazuje `[SMTP diagnostics] Preskočeno — EMAIL_PROVIDER=resend.`
+
+## Render deployment — Gmail SMTP (samo lokalno / fallback)
+
+- [ ] Gmail SMTP deluje lokalno (`/api/smtp-test` vrne `ok: true`)
+- [ ] Startup log prikazuje `[SMTP DNS]` z resolvanimi IP naslovi
+- [ ] Startup log prikazuje `[SMTP verify] OK` z `elapsedMs`
 - [ ] Napake v UI prikazujejo slovensko sporočilo (timeout / auth / DNS — ne generično)
-- [ ] Če `/api/smtp-test` vrne `CONNECTION_ERROR` z `elapsedMs ~30000` → Render blokira SMTP
-- [ ] Če SMTP blokiran → načrtuj zamenjavo z Resend/Brevo API (samo `sendEmail()` v server.js)
+- [ ] Če `/api/smtp-test` vrne `CONNECTION_ERROR` z `elapsedMs ~30000` → Render blokira SMTP → uporabi Resend
 
 ## Git
 

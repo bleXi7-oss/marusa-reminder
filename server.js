@@ -20,14 +20,16 @@ const SMTP_SECURE = process.env.SMTP_SECURE !== undefined
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Log safe SMTP config on startup (no secrets)
+// Log safe config on startup (no secrets)
 console.log('[Email config]', JSON.stringify({
-  smtpHost:    SMTP_HOST,
-  smtpPort:    SMTP_PORT,
-  smtpSecure:  SMTP_SECURE,
-  hasUser:     !!process.env.GMAIL_USER,
-  hasPassword: !!process.env.GMAIL_APP_PASSWORD,
-  hasMailFrom: !!process.env.MAIL_FROM,
+  provider:     process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'gmail-smtp',
+  hasResendKey: !!process.env.RESEND_API_KEY,
+  smtpHost:     SMTP_HOST,
+  smtpPort:     SMTP_PORT,
+  smtpSecure:   SMTP_SECURE,
+  hasUser:      !!process.env.GMAIL_USER,
+  hasPassword:  !!process.env.GMAIL_APP_PASSWORD,
+  hasMailFrom:  !!process.env.MAIL_FROM,
   hasDefaultTo: !!process.env.DEFAULT_REMINDER_EMAIL,
 }));
 
@@ -55,12 +57,9 @@ function saveReminders(reminders) {
 
 // ── Email provider ────────────────────────────────────────────
 //
-// Current provider: Gmail SMTP via nodemailer (createTransporter below).
-//
-// Production fallback path — if Render blocks outbound SMTP:
-//   1. Set RESEND_API_KEY in Render environment variables.
-//   2. Replace sendEmail() body with a Resend API call (npm install resend).
-//   3. No other code needs to change — all callers use sendEmail().
+// Two providers are supported:
+//   1. Resend API  — set EMAIL_PROVIDER=resend + RESEND_API_KEY (recommended for Render)
+//   2. Gmail SMTP  — default fallback for local use
 //
 // sendEmail() is the single call site for all outgoing email.
 
@@ -80,12 +79,32 @@ function createTransporter() {
 }
 
 async function sendEmail({ to, from, subject, text }) {
-  // Future: if (process.env.RESEND_API_KEY) { ... use Resend ... return; }
+  if (process.env.EMAIL_PROVIDER === 'resend' && process.env.RESEND_API_KEY) {
+    const { Resend } = require('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({ from, to, subject, text });
+    if (error) {
+      const err = new Error(error.message || 'Resend error');
+      err.resendError = true;
+      throw err;
+    }
+    return;
+  }
+  // Fallback: Gmail SMTP
   const transporter = createTransporter();
   await transporter.sendMail({ from, to, subject, text });
 }
 
 function checkEmailConfig() {
+  if (process.env.EMAIL_PROVIDER === 'resend') {
+    if (!process.env.RESEND_API_KEY) {
+      return {
+        message: 'Manjkajo Resend nastavitve v Render Environment Variables.',
+        code:    'MISSING_RESEND_CONFIG',
+      };
+    }
+    return null;
+  }
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     return {
       message: 'Manjkajo email nastavitve v Render Environment Variables.',
@@ -96,6 +115,13 @@ function checkEmailConfig() {
 }
 
 function smtpErrorMessage(err) {
+  if (err.resendError) {
+    return {
+      message: 'Pošiljanje prek Resend ni uspelo. Preveri RESEND_API_KEY in MAIL_FROM.',
+      code:    'RESEND_ERROR',
+    };
+  }
+
   const code = (err.code || '').toUpperCase();
   const msg  = (err.message || '').toLowerCase();
 
@@ -166,6 +192,11 @@ async function sendReminderEmail(reminder) {
 // Runs async after server start — does not block HTTP serving.
 
 async function runSmtpDiagnostics() {
+  if (process.env.EMAIL_PROVIDER === 'resend') {
+    console.log('[SMTP diagnostics] Preskočeno — EMAIL_PROVIDER=resend.');
+    return;
+  }
+
   // Step 1: DNS resolution
   try {
     const addresses = await new Promise((resolve, reject) =>
@@ -252,11 +283,11 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/email-status', (req, res) => {
   res.json({
-    provider:                'gmail-smtp',
-    hasGmailUser:            !!process.env.GMAIL_USER,
-    hasAppPassword:          !!process.env.GMAIL_APP_PASSWORD,
+    provider:                process.env.EMAIL_PROVIDER === 'resend' ? 'resend' : 'gmail-smtp',
+    hasResendApiKey:         !!process.env.RESEND_API_KEY,
     hasMailFrom:             !!process.env.MAIL_FROM,
     hasDefaultReminderEmail: !!process.env.DEFAULT_REMINDER_EMAIL,
+    gmailSmtpAvailable:      !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD),
     smtpHost:                SMTP_HOST,
     smtpPort:                SMTP_PORT,
     smtpSecure:              SMTP_SECURE,

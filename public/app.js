@@ -431,10 +431,12 @@ async function loadReminders() {
 // ── Actions ───────────────────────────────────────────────────
 
 function smtpUserMessage(data) {
-  if (data.code === 'CONNECTION_ERROR') return 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.';
-  if (data.code === 'AUTH_ERROR')       return 'Gmail prijava ni uspela. Preveri App Password.';
-  if (data.code === 'DNS_ERROR')        return 'SMTP strežnika ni mogoče najti.';
-  if (data.code === 'MISSING_CONFIG')   return 'Manjkajo email nastavitve v Render Environment Variables.';
+  if (data.code === 'RESEND_ERROR')          return 'Pošiljanje prek Resend ni uspelo. Preveri RESEND_API_KEY in MAIL_FROM.';
+  if (data.code === 'MISSING_RESEND_CONFIG') return 'Manjkajo Resend nastavitve v Render Environment Variables.';
+  if (data.code === 'CONNECTION_ERROR')      return 'Render trenutno ne more vzpostaviti SMTP povezave do Gmaila.';
+  if (data.code === 'AUTH_ERROR')            return 'Gmail prijava ni uspela. Preveri App Password.';
+  if (data.code === 'DNS_ERROR')             return 'SMTP strežnika ni mogoče najti.';
+  if (data.code === 'MISSING_CONFIG')        return 'Manjkajo email nastavitve v Render Environment Variables.';
   return data.message || 'Pošiljanje ni uspelo.';
 }
 
