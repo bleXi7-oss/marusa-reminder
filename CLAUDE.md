@@ -55,6 +55,13 @@ Two modes toggled by `.mode-switch` buttons, persisted in `localStorage('marusa_
 
 After a successful smart parse, `revealManualForm()` shows `#manualSection` with a fade animation and scrolls to it.
 
+### Help card
+
+`#helpCard` — toggled by `#helpBtn` (`?` button). Contains:
+- App usage explanation
+- Test email button (`#testEmailBtn`) with `#testEmailMsg` for feedback
+- Error code reference (ERR-001, ERR-002/003, ERR-010, ERR-012, ERR-014)
+
 ### Preview / confirmation flow
 
 When Smart Paste succeeds (confidence `high` or `medium`), `enterPreviewMode(eventDate, remindAt)` is called:
@@ -64,6 +71,8 @@ When Smart Paste succeeds (confidence `high` or `medium`), `enterPreviewMode(eve
 - `parseSmartReminderText` returns both `eventDate` (original event time) and `remindAt` (after offset) so both can be shown in the preview
 
 `exitPreviewMode()` reverses the above. Both `#saveBtn` and `#previewSaveBtn` call `savePendingReminder()` which calls `exitPreviewMode()` internally on success or validation failure.
+
+`#normalActions` contains only `#saveBtn` — the test email button is in `#helpCard`, not the form.
 
 ### Email remember
 

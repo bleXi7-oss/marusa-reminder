@@ -2,7 +2,7 @@
 
 **Ne pozabi follow-upa.**
 
-Osebna lokalna aplikacija za Gmail opomnike.  
+Osebna aplikacija za Gmail opomnike.  
 Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 
 ---
@@ -10,11 +10,12 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 ## Kaj aplikacija počne
 
 - Ustvari opomnike z naslovom, opisom in datumom
-- Ob nastavljenem času samodejno pošlje email na Gmail
-- Pametni vnos: prilepi besedilo/mail, Maruša razčleni datum in naslov
+- Ob nastavljenem času samodejno pošlje email
+- Pametni vnos: prilepi besedilo ali mail, Maruša razčleni datum in naslov
 - Ročni vnos: direkten vnos brez parsiranja
+- Zaklenjena aplikacija: zaščiti z dostopno kodo pred nepooblaščenim dostopom
 - Deluje kot PWA — namestljiva na telefon ali namizje
-- Vsi podatki so shranjeni lokalno v `data/reminders.json`
+- Vsi podatki shranjeni lokalno v `data/reminders.json`
 - Brez baze podatkov, brez prijave, brez oblaka
 
 ---
@@ -22,11 +23,11 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 ## Zahteve
 
 - Node.js (LTS) — [nodejs.org](https://nodejs.org)
-- Gmail račun z App Password
+- Gmail račun z App Password (za lokalno) **ali** Resend API ključ (za Render)
 
 ---
 
-## Namestitev
+## Namestitev (lokalno)
 
 ```bash
 npm install
@@ -39,7 +40,7 @@ Odpri brskalnik: **http://localhost:3001**
 
 ---
 
-## Nastavitev Gmail App Password
+## Gmail App Password
 
 Gmail App Password je posebno geslo samo za to aplikacijo.  
 **Nikoli ne uporabi normalnega Gmail gesla.**
@@ -62,14 +63,17 @@ PORT=3001
 
 ---
 
-## Uporaba
+## Načini vnosa
 
 ### Pametni način
 
 1. Prilepi besedilo (email, sporočilo, opomba)
 2. Izberi, koliko prej te opomni (preset ali po meri)
 3. Klikni **Razberi opomnik**
-4. Maruša prikaže predogled: Opravilo, Dogodek (čas iz besedila), Opomnik (čas po offsetu)
+4. Maruša prikaže predogled:
+   - **Opravilo** — razčlenjen naslov
+   - **Dogodek** — datum in čas iz besedila
+   - **Opomnik** — kdaj boš dobil email (po offsetu)
 5. Klikni **Shrani opomnik** za potrditev — ali **Uredi** za ročni popravek
 
 Podprti formati datumov:
@@ -79,7 +83,7 @@ Podprti formati datumov:
 - `čez 3 dni`, `čez teden`, `in 2 days`
 - `čez pol ure`, `čez 30 minut`
 
-Parsiranje je **pravilo-osnovno, brez AI**. Če datuma ni mogoče prepoznati, Maruša sporoči napako in te prosi za ročni vnos.
+Parsiranje je **pravilo-osnovno, brez AI**. Če datuma ni mogoče prepoznati, Maruša sporoči napako (`ERR-014`) in odpre ročni vnos.
 
 ### Ročni način
 
@@ -91,19 +95,36 @@ Parsiranje je **pravilo-osnovno, brez AI**. Če datuma ni mogoče prepoznati, Ma
 
 Obkljukaj **Zapomni si moj email** — naslov se shrani v brskalnik (localStorage) in se samodejno vpiše ob naslednjem obisku.
 
-### Offset opomnika
+---
+
+## Offset opomnika
 
 Preset: Ob času dogodka / 1 uro prej / 1 dan prej / 2 dni / 3 dni / 1 teden
 
-Po meri: vnesi število in enoto (minut / ur / dni / tednov)
+Po meri: vnesi število in enoto (minut / ur / dni / tednov), obseg 1–365
+
+---
+
+## Zaklenjena aplikacija (APP_ACCESS_CODE)
+
+Ko je `APP_ACCESS_CODE` nastavljen (priporočeno za Render), se ob odprtju prikaže zaklenjen zaslon.
+
+- Napačna koda → sporoči `ERR-001`
+- Pravilna koda → odklene aplikacijo
+- Opomniki se naložijo šele po odklenjenju
+- Gumb **Zakleni aplikacijo** (v headerju) počisti kodo in vrne na zaklenjen zaslon
+- API klici brez veljavne kode vrnejo HTTP 401
 
 ---
 
 ## Testiranje emaila
 
-1. Vnesi email v polje
-2. Klikni **Pošlji testni Gmail**
-3. Preveri Gmail mapo
+Gumb **Pošlji testni Gmail** je v razdelku za pomoč:
+
+1. Vnesi email v polje za opomnik
+2. Klikni **?** za odprtje pomoči
+3. Klikni **Pošlji testni Gmail**
+4. Preveri Gmail mapo
 
 ---
 
@@ -117,16 +138,34 @@ Zapri terminal = opomniki se ne pošljejo.
 
 ---
 
+## Napake (ERR kode)
+
+| Koda | Pomen | Kaj preveriti |
+|------|-------|---------------|
+| ERR-001 | Napačna koda za dostop | `APP_ACCESS_CODE` v Render env vars |
+| ERR-002 | Resend ni konfiguriran | `RESEND_API_KEY`, `MAIL_FROM` v Render |
+| ERR-003 | Resend napaka pri pošiljanju | `RESEND_API_KEY` ali `MAIL_FROM` ni verificiran |
+| ERR-004 | SMTP timeout | Render blokira SMTP — uporabi Resend |
+| ERR-005 | Gmail auth napaka | `GMAIL_USER`, `GMAIL_APP_PASSWORD` v .env |
+| ERR-006 | DNS napaka | `SMTP_HOST` ni dosegljiv |
+| ERR-007 | Gmail SMTP ni nastavljen | `GMAIL_USER`, `GMAIL_APP_PASSWORD` v .env |
+| ERR-008 | Email manjka ali neveljaven | Vnesi pravilen email naslov |
+| ERR-009 | Naslov opomnika manjka | Vnesi naslov |
+| ERR-010 | Strežnik ni pripravljen | Render → Manual Deploy |
+| ERR-011 | Opomnik ne obstaja | Osveži stran |
+| ERR-012 | App se zbuja (Render Free) | Počakaj 30–60 sekund in poskusi znova |
+| ERR-013 | SMTP blokiran ali auth napaka | Na Render: uporabi Resend |
+| ERR-014 | Datum ni prepoznan | Izberi datum ročno |
+| ERR-015 | Neznana napaka pošiljanja | Preveri konzolo strežnika |
+
+---
+
 ## PWA namestitev
 
 **Telefon (Android/iOS):** Odpri v brskalniku → meni → Dodaj na začetni zaslon  
 **Računalnik (Chrome/Edge):** Klikni ikono namestitve (⊕) v naslovni vrstici ali meni → Namesti aplikacijo
 
 Aplikacija ima ikono rožice (🌸) in deluje kot prava namizna/mobilna aplikacija.
-
-### Gumb za pomoč (?)
-
-Klikni `?` gumb poleg izbirnika načina za kratek opis kako aplikacija deluje.
 
 ---
 
@@ -135,7 +174,7 @@ Klikni `?` gumb poleg izbirnika načina za kratek opis kako aplikacija deluje.
 ```
 files/
   server.js          — Express strežnik + email logika
-  .env               — Gmail nastavitve (ne commitaj!)
+  .env               — Gmail/Resend nastavitve (ne commitaj!)
   .env.example       — primer nastavitev
   data/
     reminders.json   — shranjeni opomniki
@@ -145,46 +184,69 @@ files/
     app.js           — frontend logika + parser
     manifest.json    — PWA konfiguracija
     service-worker.js— PWA offline podpora
+    icons/           — PWA ikone
 ```
 
 ---
 
 ## Namestitev na Render
 
-Gmail SMTP **ne deluje zanesljivo na Render free tier** — Render blokira odhodne TCP povezave na portih 465 in 587 (ETIMEDOUT).  
+Gmail SMTP **ne deluje zanesljivo na Render free tier** — Render blokira odhodne TCP na portih 465 in 587 (ETIMEDOUT).  
 Priporočena rešitev je **Resend** (brezplačno, 3000 emailov/mesec, pošilja prek HTTPS).
 
-### Resend — obvezne Environment Variables na Render
+### Resend — priporočeno za Render
+
+#### Obvezne Environment Variables na Render
 
 | Spremenljivka | Vrednost |
 |---|---|
 | `EMAIL_PROVIDER` | `resend` |
 | `RESEND_API_KEY` | `re_xxx` (iz resend.com) |
-| `MAIL_FROM` | `onboarding@resend.dev` ali tvoja domena |
+| `MAIL_FROM` | `onboarding@resend.dev` ali tvoja verificirana domena |
 | `DEFAULT_REMINDER_EMAIL` | `tvoj.email@gmail.com` |
 | `NODE_ENV` | `production` |
-| `APP_ACCESS_CODE` | `tvoja-tajna-koda` (ščiti javno URL-jo) |
+| `APP_ACCESS_CODE` | `tvoja-tajna-koda` (ščiti javni URL) |
 
-> `APP_ACCESS_CODE` je enostavna zaščita pred naključnimi obiskovalci na javnem Render URL-ju.  
-> Hraniti zasebno — zamenjaj, če jo po nesreči deliš. To ni polno prijav sistema.
+> **`MAIL_FROM=onboarding@resend.dev`** je Resendov testni naslov — deluje brez lastne domene.  
+> Brez verificirane domene Resend dovoli pošiljanje **samo na email, s katerim si registriran na Resend**.  
+> Za lastno domeno verificiraj domeno na resend.com.
 
-> `MAIL_FROM=onboarding@resend.dev` je Resendov testni naslov — deluje brez lastne domene.  
-> Za lastno domeno (npr. `marusa@tvoja-domena.si`) je treba domeno verificirati na resend.com.
+> **`APP_ACCESS_CODE`** ščiti aplikacijo pred naključnimi obiskovalci na javnem Render URL-ju.  
+> Hraniti zasebno — zamenjaj, če jo po nesreči deliš. To ni polno prijavni sistem.
 
-### Korak 1 — Pridobi Resend API ključ
+#### Koraki za nastavitev
 
 1. Registriraj se na [resend.com](https://resend.com) (brezplačno)
-2. Ustvari API ključ v API Keys razdelku
-3. Nastavi env var `RESEND_API_KEY=re_xxx` na Render
+2. Ustvari API ključ v razdelku API Keys
+3. Nastavi env vars na Render (tabela zgoraj)
+4. Klikni **Manual Deploy** v Render dashboardu
 
-### Korak 2 — Preveri nastavitve
+### Gmail SMTP — samo za lokalno
 
+Gmail SMTP ostane kot fallback za lokalno testiranje (brez `EMAIL_PROVIDER=resend`).  
+Na Render ne deluje — Render blokira odhodne SMTP povezave.
+
+Diagnostičen test (samo lokalno):
 ```
-https://marusa-reminder.onrender.com/api/email-status
+http://localhost:3001/api/smtp-test
 ```
 
-Pričakovan odgovor z Resend:
+---
 
+## Kako testirati
+
+### 1. Zdravje aplikacije
+```
+GET /api/health
+```
+Pričakuješ lokalno: `{ "ok": true, "protected": false }`  
+Pričakuješ na Render: `{ "ok": true, "protected": true }`
+
+### 2. Email nastavitve
+```
+GET /api/email-status    (z X-App-Code headerjem, če je zaščiteno)
+```
+Pričakuješ na Render z Resend:
 ```json
 {
   "provider": "resend",
@@ -195,53 +257,41 @@ Pričakovan odgovor z Resend:
 }
 ```
 
-### Korak 3 — Pošlji testni email
+### 3. Testni email
+1. Vnesi email v polje za opomnik
+2. Klikni **?** za pomoč
+3. Klikni **Pošlji testni Gmail**
+4. Preveri Gmail mapo
 
-Klikni **Pošlji testni Gmail** v aplikaciji — pri `provider: resend` gre prek Resend API.
-
-Napake:
-
-| code | Pomen |
-|---|---|
-| `RESEND_ERROR` | Napačen API ključ ali MAIL_FROM ni verificiran |
-| `MISSING_RESEND_CONFIG` | `RESEND_API_KEY` ni nastavljen na Render |
+### 4. Opomnik od začetka do konca
+1. Ustvari opomnik z datumom 1–2 minuti v prihodnosti
+2. Počakaj
+3. Preveri Gmail — email mora prispeti
+4. Opomnik mora biti označen kot poslano v aplikaciji
 
 ---
 
-### Gmail SMTP — samo za lokalno uporabo
+## Znane omejitve
 
-Gmail SMTP ostane kot fallback (brez `EMAIL_PROVIDER=resend`).  
-Za lokalno testiranje nastavi v `.env`:
-
-```
-GMAIL_USER=tvoj.email@gmail.com
-GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
-MAIL_FROM=tvoj.email@gmail.com
-```
-
-Diagnostičen SMTP test (samo za Gmail):
-
-```
-http://localhost:3001/api/smtp-test
-```
-
-Napake pri Gmail SMTP:
-
-| code | Pomen |
-|---|---|
-| `CONNECTION_ERROR` | TCP/timeout — Render blokira SMTP |
-| `AUTH_ERROR` | Napačen App Password |
-| `DNS_ERROR` | SMTP_HOST ni dosegljiv |
-| `MISSING_CONFIG` | `GMAIL_USER` ali `GMAIL_APP_PASSWORD` nista nastavljena |
+- **Render Free plan spi:** Render free tier ugasne aplikacijo po 15 minutah neaktivnosti. Ob prvem odprtju se zbudi v 30–60 sekundah (`ERR-012`). Opomniki, ki bi morali biti poslani med spanjem, bodo poslani ob naslednjem zbujanju.
+- **Gmail SMTP na Render ne deluje:** Render blokira odhodne SMTP povezave. Na Render vedno uporabljai Resend.
+- **Parser je pravilo-osnoven:** Pametni način razčleni datum z regularnimi izrazi — brez AI. Nestandardni formati morda ne bodo prepoznani.
+- **Ni multi-user sistema:** Ena instanca = en uporabnik. Brez prijave, brez ločenih računov.
+- **Opomniki delujejo samo ko strežnik teče:** Lokalno: zapri terminal = opomniki se ne pošljejo.
 
 ---
 
 ## Odpravljanje težav
 
-**Gmail ne deluje:**
+**Gmail ne deluje lokalno:**
 - Preveri App Password v `.env`
 - Preveri da je 2-stopenjsko preverjanje vklopljeno
 - Preveri `GMAIL_USER` in `GMAIL_APP_PASSWORD`
+
+**Resend ne deluje na Render:**
+- Preveri `RESEND_API_KEY` in `EMAIL_PROVIDER=resend` v Render env vars
+- Preveri da `MAIL_FROM` ni prazno
+- Z `onboarding@resend.dev` lahko pošiljaš samo na email, s katerim si registriran na Resend
 
 **Opomnik ni bil poslan:**
 - Preveri da strežnik teče (`npm start`)
@@ -249,8 +299,18 @@ Napake pri Gmail SMTP:
 - Preveri konzolo za napake
 
 **Pametni način ne prepozna datuma:**
-- Parsiranje je pravilo-osnovno — poskusi z jasnejšim formatom
+- Parsiranje je pravilo-osnovno — poskusi z jasnejšim formatom (npr. `12.5.2026 ob 10:00`)
 - Ročno nastavi datum v obrazcu
+
+---
+
+## Git varnost
+
+- `.env` je v `.gitignore` — **nikoli ne commitaj `.env`**
+- `node_modules/` je v `.gitignore`
+- `data/` je v `.gitignore`
+
+Pred vsakim commitom preveri: `git status`
 
 ---
 
