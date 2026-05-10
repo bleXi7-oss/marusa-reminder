@@ -1024,12 +1024,14 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
   d.setHours(9, 0, 0, 0);
   document.getElementById('remindAt').value = toDatetimeLocalValue(d);
 
-  // Restore saved email
+  // Restore saved email — readonly is set in HTML to block browser autofill until this point
   const savedEmail = localStorage.getItem(EMAIL_KEY);
+  const emailEl = document.getElementById('email');
   if (savedEmail) {
-    document.getElementById('email').value = savedEmail;
+    emailEl.value = savedEmail;
     document.getElementById('rememberEmail').checked = true;
   }
+  emailEl.removeAttribute('readonly');
   updateEmailStatus();
 
   // Restore last mode
