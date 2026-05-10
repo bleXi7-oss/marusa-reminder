@@ -930,6 +930,90 @@ document.getElementById('email').addEventListener('input', function () {
   updateEmailStatus();
 });
 
+// ── Theme ─────────────────────────────────────────────────────
+
+const THEME_KEY        = 'marusa_theme';
+const THEME_CUSTOM_KEY = 'marusa_theme_custom';
+
+const THEMES = {
+  marusa: { '--bg':'#f9f5f0','--surface':'#ffffff','--border':'#ede8e0','--text':'#2c2521','--muted':'#8a7f78','--accent':'#c96a4a','--accent-lt':'#f5e8e3' },
+  forest: { '--bg':'#f0f5f1','--surface':'#ffffff','--border':'#cde0d2','--text':'#1e2d21','--muted':'#5e8066','--accent':'#3d8c52','--accent-lt':'#d8eede' },
+  night:  { '--bg':'#1e1e2a','--surface':'#28283a','--border':'#3e3e56','--text':'#e0e0f0','--muted':'#9090b0','--accent':'#a087d4','--accent-lt':'#3a2860' },
+};
+
+function lightenColor(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const h = n => Math.round(n).toString(16).padStart(2, '0');
+  return '#' + h(r + (255-r)*0.82) + h(g + (255-g)*0.82) + h(b + (255-b)*0.82);
+}
+
+function applyTheme(name, customColors) {
+  const vars = Object.assign({}, THEMES[name] || THEMES.marusa);
+
+  if (name === 'custom' && customColors) {
+    Object.assign(vars, THEMES.marusa);
+    if (customColors.accent) { vars['--accent'] = customColors.accent; vars['--accent-lt'] = lightenColor(customColors.accent); }
+    if (customColors.bg)      vars['--bg']      = customColors.bg;
+    if (customColors.surface) vars['--surface'] = customColors.surface;
+  }
+
+  const root = document.documentElement;
+  for (const prop in vars) root.style.setProperty(prop, vars[prop]);
+  root.setAttribute('data-theme', name);
+
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', vars['--accent']);
+
+  const accentEl  = document.getElementById('customAccent');
+  const bgEl      = document.getElementById('customBg');
+  const surfaceEl = document.getElementById('customSurface');
+  if (accentEl)  accentEl.value  = vars['--accent'];
+  if (bgEl)      bgEl.value      = vars['--bg'];
+  if (surfaceEl) surfaceEl.value = vars['--surface'];
+
+  document.querySelectorAll('.btn-theme').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === name);
+  });
+}
+
+function loadSavedTheme() {
+  const saved = localStorage.getItem(THEME_KEY) || 'marusa';
+  let custom = null;
+  if (saved === 'custom') {
+    try { custom = JSON.parse(localStorage.getItem(THEME_CUSTOM_KEY) || '{}'); } catch {}
+  }
+  applyTheme(saved, custom);
+}
+
+document.querySelectorAll('.btn-theme').forEach(btn => {
+  btn.addEventListener('click', function () {
+    applyTheme(this.dataset.theme, null);
+    localStorage.setItem(THEME_KEY, this.dataset.theme);
+    localStorage.removeItem(THEME_CUSTOM_KEY);
+  });
+});
+
+['customAccent', 'customBg', 'customSurface'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    const custom = {
+      accent:  document.getElementById('customAccent').value,
+      bg:      document.getElementById('customBg').value,
+      surface: document.getElementById('customSurface').value,
+    };
+    applyTheme('custom', custom);
+    localStorage.setItem(THEME_KEY, 'custom');
+    localStorage.setItem(THEME_CUSTOM_KEY, JSON.stringify(custom));
+  });
+});
+
+document.getElementById('resetThemeBtn').addEventListener('click', () => {
+  applyTheme('marusa', null);
+  localStorage.setItem(THEME_KEY, 'marusa');
+  localStorage.removeItem(THEME_CUSTOM_KEY);
+});
+
 // ── PWA Install ───────────────────────────────────────────────
 
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
@@ -937,6 +1021,8 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 // ── Init ──────────────────────────────────────────────────────
 
 (async function init() {
+  loadSavedTheme();
+
   // Default reminder time: tomorrow at 09:00
   const d = new Date();
   d.setDate(d.getDate() + 1);

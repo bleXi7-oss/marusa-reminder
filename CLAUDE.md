@@ -78,6 +78,14 @@ When Smart Paste succeeds (confidence `high` or `medium`), `enterPreviewMode(eve
 
 `localStorage('marusa_email')` — saved when user types if checkbox is checked, cleared when unchecked. Loaded on init.
 
+## Theme system
+
+CSS variables `--bg`, `--surface`, `--border`, `--text`, `--muted`, `--accent`, `--accent-lt` control all colors. Three presets: `marusa`, `forest`, `night`. Custom mode applies user-chosen accent/bg/surface on top of the marusa base.
+
+`THEMES` object in `app.js` holds preset values. `applyTheme(name, customColors)` writes vars to `documentElement.style` and sets `data-theme` attribute (used by CSS `[data-theme="night"]` overrides for hardcoded badge/preview colors). `loadSavedTheme()` restores from `localStorage('marusa_theme')` and `localStorage('marusa_theme_custom')`.
+
+FOUC prevention: inline `<script>` in `<head>` reads localStorage and sets CSS vars before page renders.
+
 ## Smart Paste parser (`public/app.js`)
 
 Rule-based only — no AI, no external APIs.

@@ -15,6 +15,17 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/style.css" />
+  <script>
+  (function(){
+    var t=localStorage.getItem('marusa_theme')||'marusa';
+    var m={marusa:['#f9f5f0','#ffffff','#ede8e0','#2c2521','#8a7f78','#c96a4a','#f5e8e3'],forest:['#f0f5f1','#ffffff','#cde0d2','#1e2d21','#5e8066','#3d8c52','#d8eede'],night:['#1e1e2a','#28283a','#3e3e56','#e0e0f0','#9090b0','#a087d4','#3a2860']};
+    var k=['--bg','--surface','--border','--text','--muted','--accent','--accent-lt'];
+    var v=m[t]||m.marusa;var r=document.documentElement;
+    k.forEach(function(p,i){r.style.setProperty(p,v[i]);});
+    r.setAttribute('data-theme',t);
+    if(t==='custom'){try{var c=JSON.parse(localStorage.getItem('marusa_theme_custom')||'{}');if(c.bg)r.style.setProperty('--bg',c.bg);if(c.surface)r.style.setProperty('--surface',c.surface);if(c.accent){r.style.setProperty('--accent',c.accent);var x=c.accent,rr=parseInt(x.slice(1,3),16),gg=parseInt(x.slice(3,5),16),bb=parseInt(x.slice(5,7),16),h=function(n){return Math.round(n).toString(16).padStart(2,'0');};r.style.setProperty('--accent-lt','#'+h(rr+(255-rr)*.82)+h(gg+(255-gg)*.82)+h(bb+(255-bb)*.82));}}catch(e){}}
+  })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
 </head>
@@ -61,6 +72,29 @@
           <p class="help-test-hint">Preveri ali email pošiljanje deluje pravilno.</p>
           <button id="testEmailBtn" class="btn-secondary help-test-btn">Pošlji testni Gmail</button>
           <div id="testEmailMsg" class="message hidden"></div>
+        </div>
+        <div class="help-theme">
+          <div class="help-theme-title">Tema</div>
+          <div class="theme-presets">
+            <button class="btn-theme" data-theme="marusa">Maruša</button>
+            <button class="btn-theme" data-theme="forest">Gozd</button>
+            <button class="btn-theme" data-theme="night">Noč</button>
+          </div>
+          <div class="theme-custom-controls">
+            <div class="theme-color-row">
+              <span class="theme-color-label">Poudarek</span>
+              <input type="color" id="customAccent" class="theme-color-input" value="#c96a4a" />
+            </div>
+            <div class="theme-color-row">
+              <span class="theme-color-label">Ozadje</span>
+              <input type="color" id="customBg" class="theme-color-input" value="#f9f5f0" />
+            </div>
+            <div class="theme-color-row">
+              <span class="theme-color-label">Kartica</span>
+              <input type="color" id="customSurface" class="theme-color-input" value="#ffffff" />
+            </div>
+          </div>
+          <button id="resetThemeBtn" class="btn-small theme-reset-btn">Ponastavi temo</button>
         </div>
         <div class="help-errors">
           <div class="help-errors-title">Napake / kaj preveriti</div>

@@ -15,6 +15,7 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 - Ročni vnos: direkten vnos brez parsiranja
 - Zaklenjena aplikacija: zaščiti z dostopno kodo pred nepooblaščenim dostopom
 - Deluje kot PWA — namestljiva na telefon ali namizje
+- Tema: 3 prednastavljene teme (Maruša, Gozd, Noč) in lastne barve, shranjeno v brskalnik
 - Vsi podatki shranjeni lokalno v `data/reminders.json`
 - Brez baze podatkov, brez prijave, brez oblaka
 
@@ -157,6 +158,18 @@ Zapri terminal = opomniki se ne pošljejo.
 | ERR-013 | SMTP blokiran ali auth napaka | Na Render: uporabi Resend |
 | ERR-014 | Datum ni prepoznan | Izberi datum ročno |
 | ERR-015 | Neznana napaka pošiljanja | Preveri konzolo strežnika |
+
+---
+
+## Tema
+
+V pomoči (`?`) izberi med prednastavljenimi temami ali nastavi lastne barve:
+
+- **Maruša** — privzeta kremna/rožnata tema
+- **Gozd** — mirna zelena tema
+- **Noč** — temna tema
+
+Lastne barve (poudarek, ozadje, kartica) se takoj uveljavijo in shranijo v brskalnik (`localStorage`). Gumb **Ponastavi temo** vrne na privzeto temo Maruša.
 
 ---
 

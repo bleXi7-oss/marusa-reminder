@@ -100,7 +100,7 @@ input, textarea, select {
 
 input:focus, textarea:focus, select:focus {
   border-color: var(--accent);
-  background: #fff;
+  background: var(--surface);
 }
 
 select {
@@ -605,6 +605,89 @@ input.field-error, textarea.field-error {
   width: 100%;
   font-size: 0.85rem;
 }
+
+/* ── Help card theme section ───────────────────────────────── */
+.help-theme {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.help-theme-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.theme-presets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.btn-theme {
+  flex: 1;
+  padding: 7px 4px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-theme:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn-theme.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.theme-custom-controls { margin-bottom: 8px; }
+
+.theme-color-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.theme-color-label {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+input.theme-color-input {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  -webkit-appearance: auto;
+  appearance: auto;
+  flex-shrink: 0;
+}
+
+.theme-reset-btn { width: 100%; text-align: center; }
+
+/* ── Night theme overrides for hardcoded colors ─────────────── */
+[data-theme="night"] .preview-block   { background: #1e3828; border-color: #2d5040; }
+[data-theme="night"] .preview-value   { color: #c0e8cc; }
+[data-theme="night"] .preview-label   { color: #5ec882; }
+[data-theme="night"] .help-note       { background: #2a2010; color: #d4a85a; }
+[data-theme="night"] .badge-sent      { background: #1e3828; color: #5ec882; }
+[data-theme="night"] .badge-waiting   { background: #2a2010; color: #d4a85a; }
 
 /* ── Help card errors section ──────────────────────────────── */
 .help-errors {
