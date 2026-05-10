@@ -88,11 +88,6 @@ async function initAuth() {
     return true; // if health check fails, proceed without lock
   }
 
-  // Prefill default email if not already saved
-  if (data.defaultEmail && !localStorage.getItem(EMAIL_KEY)) {
-    document.getElementById('email').value = data.defaultEmail;
-  }
-
   if (!data.protected) {
     document.getElementById('lockBtn').classList.add('hidden');
     return true;
@@ -1040,7 +1035,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
   // Restore last mode
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
 
-  // Auth check + default email prefill (from /api/health)
+  // Auth check (lock screen / protected mode)
   const ready = await initAuth();
   if (ready) await loadReminders();
 })();

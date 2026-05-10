@@ -76,7 +76,7 @@ When Smart Paste succeeds (confidence `high` or `medium`), `enterPreviewMode(eve
 
 ### Email remember
 
-`localStorage('marusa_email')` — saved when user types if checkbox is checked, cleared when unchecked. Loaded on init.
+`localStorage('marusa_email')` — saved when user types if checkbox is checked, cleared when unchecked. Loaded on init. **The email field is never pre-filled from the backend** — `DEFAULT_REMINDER_EMAIL` is backend-only and is not sent to the frontend.
 
 ## Theme system
 
@@ -115,7 +115,7 @@ All routes except `/api/health` and `/api/auth` require `X-App-Code` header when
 
 | Method | Path | Auth | Purpose |
 |--------|------|------|---------|
-| GET | `/api/health` | No | App status + `protected` flag + `defaultEmail` |
+| GET | `/api/health` | No | App status + `protected` flag (no secrets exposed) |
 | GET | `/api/auth` | Yes | Verify access code (used by frontend unlock) |
 | GET | `/api/reminders` | Yes | List all |
 | POST | `/api/reminders` | Yes | Create (`{title, description?, remindAt, email}`) |

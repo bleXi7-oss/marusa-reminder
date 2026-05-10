@@ -308,9 +308,8 @@ setInterval(checkAndSendReminders, 60 * 1000);
 // Unprotected: returns app status for frontend init (no secrets)
 app.get('/api/health', (req, res) => {
   res.json({
-    ok:           true,
-    protected:    !!process.env.APP_ACCESS_CODE,
-    defaultEmail: process.env.DEFAULT_REMINDER_EMAIL || null,
+    ok:        true,
+    protected: !!process.env.APP_ACCESS_CODE,
   });
 });
 

@@ -144,20 +144,20 @@ Zapri terminal = opomniki se ne pošljejo.
 | Koda | Pomen | Kaj preveriti |
 |------|-------|---------------|
 | ERR-001 | Napačna koda za dostop | `APP_ACCESS_CODE` v Render env vars |
-| ERR-002 | Resend ni konfiguriran | `RESEND_API_KEY`, `MAIL_FROM` v Render |
-| ERR-003 | Resend napaka pri pošiljanju | `RESEND_API_KEY` ali `MAIL_FROM` ni verificiran |
-| ERR-004 | SMTP timeout | Render blokira SMTP — uporabi Resend |
-| ERR-005 | Gmail auth napaka | `GMAIL_USER`, `GMAIL_APP_PASSWORD` v .env |
-| ERR-006 | DNS napaka | `SMTP_HOST` ni dosegljiv |
-| ERR-007 | Gmail SMTP ni nastavljen | `GMAIL_USER`, `GMAIL_APP_PASSWORD` v .env |
-| ERR-008 | Email manjka ali neveljaven | Vnesi pravilen email naslov |
-| ERR-009 | Naslov opomnika manjka | Vnesi naslov |
-| ERR-010 | Strežnik ni pripravljen | Render → Manual Deploy |
-| ERR-011 | Opomnik ne obstaja | Osveži stran |
+| ERR-002 | Resend API key manjka | `RESEND_API_KEY` v Render env vars |
+| ERR-003 | Resend napaka pri pošiljanju | `RESEND_API_KEY`, `MAIL_FROM` in Render logs |
+| ERR-004 | `MAIL_FROM` ni nastavljen | `MAIL_FROM` v Render env vars |
+| ERR-005 | `DEFAULT_REMINDER_EMAIL` ni nastavljen | `DEFAULT_REMINDER_EMAIL` v Render env vars |
+| ERR-006 | Opomnik ni bil najden | Osveži stran |
+| ERR-007 | Opomnik ni bil shranjen | Preveri Render logs |
+| ERR-008 | Email manjka ali ni veljaven | Vnesi pravilen email naslov |
+| ERR-009 | Datum manjka ali je neveljaven | Izberi pravilen datum in uro |
+| ERR-010 | Render/redeploy problem | Render → Manual Deploy |
+| ERR-011 | GitHub ni posodobljen | Zaženi `git push` |
 | ERR-012 | App se zbuja (Render Free) | Počakaj 30–60 sekund in poskusi znova |
 | ERR-013 | SMTP blokiran ali auth napaka | Na Render: uporabi Resend |
 | ERR-014 | Datum ni prepoznan | Izberi datum ročno |
-| ERR-015 | Neznana napaka pošiljanja | Preveri konzolo strežnika |
+| ERR-015 | Nepričakovana napaka | Preveri konzolo strežnika |
 
 ---
 
