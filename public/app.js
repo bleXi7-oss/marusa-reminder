@@ -644,6 +644,7 @@ function toDatetimeLocalValue(date) {
 // ── UX helpers ────────────────────────────────────────────────
 
 let lastParsedEventDate = null;
+let allReminders = [];
 
 function formatSlDate(date) {
   return date.toLocaleString('sl-SI', {
@@ -706,13 +707,36 @@ function recomputeSmartRemind() {
   updateTimingPreview();
 }
 
+// ── Pinned Reminders ──────────────────────────────────────────
+
+const PINNED_KEY = 'marusa_pinned';
+
+function getPinnedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(PINNED_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function setPinned(id, pinned) {
+  const ids = getPinnedIds();
+  if (pinned) ids.add(id); else ids.delete(id);
+  localStorage.setItem(PINNED_KEY, JSON.stringify([...ids]));
+}
+
+function isPinned(id) { return getPinnedIds().has(id); }
+
+function togglePin(id) {
+  setPinned(id, !isPinned(id));
+  renderAll(allReminders);
+}
+
 // ── Render reminders ──────────────────────────────────────────
 
 function renderCard(r) {
   const status = getStatus(r);
   const { text, cls } = statusLabel(status);
+  const pinned = isPinned(r.id);
   const card = document.createElement('div');
-  card.className = `reminder-card${status === 'sent' ? ' sent' : ''}`;
+  card.className = `reminder-card${status === 'sent' ? ' sent' : ''}${pinned ? ' pinned' : ''}`;
   card.innerHTML = `
     <div class="card-header">
       <div class="card-title">${escHtml(r.title)}</div>
@@ -721,6 +745,7 @@ function renderCard(r) {
     ${r.description ? `<div class="card-desc">${escHtml(r.description)}</div>` : ''}
     <div class="card-time">🕐 ${formatDate(r.remindAt)}</div>
     <div class="card-actions">
+      ${!r.sent ? `<button class="btn-pin${pinned ? ' pinned' : ''}" onclick="togglePin('${r.id}')" title="${pinned ? 'Odpni' : 'Pripni'}">📌</button>` : ''}
       ${status !== 'sent' ? `<button class="btn-small" onclick="sendNow('${r.id}', this)">Pošlji zdaj</button>` : ''}
       <button class="btn-small danger" onclick="deleteReminder('${r.id}', this)">Izbriši</button>
     </div>
@@ -729,6 +754,9 @@ function renderCard(r) {
 }
 
 function renderAll(reminders) {
+  allReminders = reminders;
+  checkAndNotify(reminders);
+
   const upcoming = reminders.filter(r => !r.sent);
   const sent     = reminders.filter(r => r.sent);
   const upcomingList = document.getElementById('upcomingList');
@@ -740,7 +768,12 @@ function renderAll(reminders) {
   if (upcoming.length === 0) {
     upcomingList.innerHTML = '<div class="empty">Ni še nobenih opomnikov 😄</div>';
   } else {
-    upcoming.sort((a, b) => new Date(a.remindAt) - new Date(b.remindAt));
+    upcoming.sort((a, b) => {
+      const pa = isPinned(a.id) ? 0 : 1;
+      const pb = isPinned(b.id) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      return new Date(a.remindAt) - new Date(b.remindAt);
+    });
     upcoming.forEach(r => upcomingList.appendChild(renderCard(r)));
   }
 
@@ -790,16 +823,62 @@ async function sendNow(id, btn) {
 }
 
 async function deleteReminder(id, btn) {
-  if (!confirm('Izbriši ta opomnik?')) return;
   btn.disabled = true;
+  const reminderData = allReminders.find(r => r.id === id);
+  const undoData = reminderData ? { ...reminderData, pinned: isPinned(id) } : null;
   try {
     const res = await apiFetch(`/api/reminders/${id}`, { method: 'DELETE' });
-    if (res.status === 401) { handleUnauthorized(); return; }
+    if (res.status === 401) { handleUnauthorized(); btn.disabled = false; return; }
+    if (!res.ok) { btn.disabled = false; return; }
+    if (undoData) showUndoToast(undoData);
     await loadReminders();
   } catch {
     btn.disabled = false;
   }
 }
+
+// ── Undo Delete ───────────────────────────────────────────────
+
+let undoPending = null;
+let undoTimer   = null;
+
+function showUndoToast(reminderData) {
+  undoPending = reminderData;
+  if (undoTimer) clearTimeout(undoTimer);
+  const toast = document.getElementById('undoToast');
+  toast.classList.remove('hidden', 'hiding');
+  undoTimer = setTimeout(() => hideUndoToast(), 5000);
+}
+
+function hideUndoToast() {
+  const toast = document.getElementById('undoToast');
+  if (toast.classList.contains('hidden')) return;
+  toast.classList.add('hiding');
+  setTimeout(() => {
+    toast.classList.add('hidden');
+    toast.classList.remove('hiding');
+    undoPending = null;
+    undoTimer   = null;
+  }, 220);
+}
+
+document.getElementById('undoBtn').addEventListener('click', async () => {
+  if (!undoPending) return;
+  const data = undoPending;
+  hideUndoToast();
+  try {
+    const res = await apiFetch('/api/reminders', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ title: data.title, description: data.description, remindAt: data.remindAt, email: data.email }),
+    });
+    if (res.ok) {
+      const created = await res.json();
+      if (data.pinned) setPinned(created.id, true);
+      await loadReminders();
+    }
+  } catch {}
+});
 
 // ── Form save ─────────────────────────────────────────────────
 
@@ -1213,6 +1292,76 @@ document.getElementById('resetThemeBtn').addEventListener('click', () => {
   localStorage.removeItem(THEME_CUSTOM_KEY);
 });
 
+// ── Browser Notifications ─────────────────────────────────────
+
+const appStartTime = Date.now();
+const NOTIF_KEY    = 'marusa_notified';
+
+function getNotifiedIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIF_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function markNotified(id) {
+  const ids = getNotifiedIds();
+  ids.add(id);
+  localStorage.setItem(NOTIF_KEY, JSON.stringify([...ids]));
+}
+
+function checkAndNotify(reminders) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const notified = getNotifiedIds();
+  const now = Date.now();
+  reminders.forEach(r => {
+    if (notified.has(r.id)) return;
+    const t = new Date(r.remindAt).getTime();
+    // Only notify for reminders that became due after app started (30s tolerance)
+    if (t <= now && t >= appStartTime - 30000) {
+      try {
+        const n = new Notification('🔔 Maruša Reminder', {
+          body: r.title + (r.description ? '\n' + r.description : ''),
+          icon: '/icons/apple-touch-icon.png',
+          tag:  'marusa-' + r.id,
+        });
+        n.onclick = () => { window.focus(); };
+      } catch(e) {}
+      markNotified(r.id);
+    }
+  });
+}
+
+function updateNotifUI() {
+  const statusEl = document.getElementById('notifStatus');
+  const btn      = document.getElementById('notifRequestBtn');
+  if (!statusEl || !btn) return;
+
+  if (!('Notification' in window)) {
+    statusEl.textContent = 'Ta brskalnik ne podpira obvestil.';
+    btn.classList.add('hidden');
+    return;
+  }
+
+  if (Notification.permission === 'granted') {
+    statusEl.textContent = '✓ Browser obvestila omogočena.';
+    statusEl.className   = 'notif-status notif-granted';
+    btn.classList.add('hidden');
+  } else if (Notification.permission === 'denied') {
+    statusEl.textContent = 'Obvestila so blokirana. Omogoči jih v nastavitvah brskalnika.';
+    statusEl.className   = 'notif-status';
+    btn.classList.add('hidden');
+  } else {
+    statusEl.textContent = 'Dovoli browser obvestila za hitre opomnike.';
+    statusEl.className   = 'notif-status';
+    btn.classList.remove('hidden');
+  }
+}
+
+document.getElementById('notifRequestBtn').addEventListener('click', async () => {
+  if (!('Notification' in window)) return;
+  await Notification.requestPermission();
+  updateNotifUI();
+});
+
 // ── PWA Install ───────────────────────────────────────────────
 
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
@@ -1242,6 +1391,8 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
 
   updateTimingPreview();
+
+  updateNotifUI();
 
   // Auth check (lock screen / protected mode)
   const ready = await initAuth();

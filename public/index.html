@@ -96,6 +96,11 @@
           </div>
           <button id="resetThemeBtn" class="btn-small theme-reset-btn">Ponastavi temo</button>
         </div>
+        <div class="help-notif">
+          <div class="help-notif-title">🔔 Browser obvestila</div>
+          <div id="notifStatus" class="notif-status">Dovoli browser obvestila za hitre opomnike.</div>
+          <button id="notifRequestBtn" class="btn-secondary help-test-btn">Omogoči obvestila</button>
+        </div>
         <div class="help-errors">
           <div class="help-errors-title">Napake / kaj preveriti</div>
           <div class="help-error-row"><span class="help-err-code">ERR-001</span> Napačna koda za dostop — preveri APP_ACCESS_CODE v Render.</div>
@@ -241,6 +246,11 @@
 
     </main>
 
+  </div>
+
+  <div id="undoToast" class="undo-toast hidden">
+    <span>🗑 Opomnik izbrisan.</span>
+    <button class="btn-undo" id="undoBtn">Razveljavi</button>
   </div>
 
   <script src="/app.js"></script>

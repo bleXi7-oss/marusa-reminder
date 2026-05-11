@@ -820,6 +820,96 @@ input.theme-color-input {
   cursor: not-allowed;
 }
 
+/* ── Notification settings in help card ─────────────────────── */
+.help-notif {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.help-notif-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.notif-status {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.notif-granted { color: var(--green); }
+
+/* ── Undo toast ─────────────────────────────────────────────── */
+.undo-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: var(--surface);
+  padding: 12px 16px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.88rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  z-index: 200;
+  white-space: nowrap;
+  animation: slideUp 0.22s ease;
+}
+
+.undo-toast.hiding { animation: slideDown 0.22s ease forwards; }
+
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(24px); opacity: 0; }
+  to   { transform: translateX(-50%) translateY(0);    opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { transform: translateX(-50%) translateY(0);    opacity: 1; }
+  to   { transform: translateX(-50%) translateY(24px); opacity: 0; }
+}
+
+.btn-undo {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ── Pin button ─────────────────────────────────────────────── */
+.btn-pin {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  background: var(--bg);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-pin:hover  { color: var(--accent); border-color: var(--accent-lt); background: var(--accent-lt); }
+.btn-pin.pinned { color: var(--accent); border-color: var(--accent);    background: var(--accent-lt); }
+
+/* ── Pinned reminder card ────────────────────────────────────── */
+.reminder-card.pinned { border-left: 3px solid var(--accent); }
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }
@@ -827,4 +917,5 @@ input.theme-color-input {
   .form-actions { flex-direction: column; }
   .btn-primary { min-width: unset; }
   .lock-card { padding: 32px 20px 24px; }
+  .undo-toast { bottom: 16px; font-size: 0.82rem; gap: 10px; }
 }
