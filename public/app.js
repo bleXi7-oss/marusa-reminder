@@ -1501,12 +1501,7 @@ function revealManualForm() {
 document.getElementById('modeSmartBtn').addEventListener('click', () => setMode('smart'));
 document.getElementById('modeManualBtn').addEventListener('click', () => setMode('manual'));
 
-document.getElementById('helpBtn').addEventListener('click', function () {
-  const card = document.getElementById('helpCard');
-  const show = card.classList.contains('hidden');
-  card.classList.toggle('hidden', !show);
-  this.classList.toggle('active', show);
-});
+document.getElementById('helpBtn').addEventListener('click', openHelpModal);
 
 // ── Custom Offset Toggle ──────────────────────────────────────
 
@@ -1830,6 +1825,196 @@ document.getElementById('email').addEventListener('input', function () {
 
 // ── Theme ─────────────────────────────────────────────────────
 
+// ── Title Personalization ─────────────────────────────────────
+
+const TITLE_KEY       = 'marusa_app_title';
+const TITLE_STYLE_KEY = 'marusa_title_style';
+const DEFAULT_TITLE   = 'Maruša Reminder';
+const DEFAULT_STYLE   = 'classic';
+
+let currentTitleStyle = DEFAULT_STYLE;
+
+function applyTitleStyle(style, el) {
+  const target = el || document.getElementById('appTitle');
+  if (!target) return;
+  target.className = 'title-' + (style || DEFAULT_STYLE);
+}
+
+function loadSavedTitle() {
+  const title = localStorage.getItem(TITLE_KEY) || DEFAULT_TITLE;
+  const style = localStorage.getItem(TITLE_STYLE_KEY) || DEFAULT_STYLE;
+  const el = document.getElementById('appTitle');
+  if (el) {
+    el.textContent = title;
+    applyTitleStyle(style);
+  }
+  currentTitleStyle = style;
+  document.querySelectorAll('.btn-title-style').forEach(b => {
+    b.classList.toggle('active', b.dataset.style === style);
+  });
+}
+
+function updateTitleStyleButtons(style) {
+  document.querySelectorAll('.btn-title-style').forEach(b => {
+    b.classList.toggle('active', b.dataset.style === style);
+  });
+}
+
+function updateTitlePreview(text, style) {
+  const preview = document.getElementById('titleEditorPreview');
+  if (!preview) return;
+  preview.textContent = '🌸 ' + (text || DEFAULT_TITLE);
+  preview.className = 'title-editor-preview title-' + style;
+}
+
+document.getElementById('editTitleBtn').addEventListener('click', () => {
+  const editor = document.getElementById('titleEditor');
+  const input  = document.getElementById('titleInput');
+  const current = document.getElementById('appTitle').textContent;
+  input.value        = current === DEFAULT_TITLE ? '' : current;
+  currentTitleStyle  = localStorage.getItem(TITLE_STYLE_KEY) || DEFAULT_STYLE;
+  updateTitleStyleButtons(currentTitleStyle);
+  updateTitlePreview(current, currentTitleStyle);
+  editor.classList.remove('hidden');
+  input.focus();
+});
+
+document.getElementById('cancelTitleBtn').addEventListener('click', () => {
+  document.getElementById('titleEditor').classList.add('hidden');
+});
+
+document.getElementById('saveTitleBtn').addEventListener('click', () => {
+  const input = document.getElementById('titleInput');
+  const title = input.value.trim() || DEFAULT_TITLE;
+  localStorage.setItem(TITLE_KEY, title);
+  localStorage.setItem(TITLE_STYLE_KEY, currentTitleStyle);
+  document.getElementById('appTitle').textContent = title;
+  applyTitleStyle(currentTitleStyle);
+  document.getElementById('titleEditor').classList.add('hidden');
+  // Sync browser tab title (strip emoji for clean tab)
+  document.title = title.replace(/\p{Emoji_Presentation}/gu, '').trim() || 'Maruša Reminder';
+});
+
+document.getElementById('titleInput').addEventListener('input', function () {
+  updateTitlePreview(this.value, currentTitleStyle);
+});
+
+document.getElementById('titleInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('saveTitleBtn').click();
+  if (e.key === 'Escape') document.getElementById('cancelTitleBtn').click();
+});
+
+document.querySelectorAll('.btn-title-style').forEach(btn => {
+  btn.addEventListener('click', function () {
+    currentTitleStyle = this.dataset.style;
+    updateTitleStyleButtons(currentTitleStyle);
+    updateTitlePreview(
+      document.getElementById('titleInput').value || document.getElementById('appTitle').textContent,
+      currentTitleStyle
+    );
+  });
+});
+
+// ── Help Modal ────────────────────────────────────────────────
+
+function openHelpModal() {
+  document.getElementById('helpModal').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => {
+    const s = document.getElementById('helpSearch');
+    if (s) s.focus();
+  }, 320);
+}
+
+function closeHelpModal() {
+  document.getElementById('helpModal').classList.add('hidden');
+  document.body.style.overflow = '';
+  const s = document.getElementById('helpSearch');
+  if (s) { s.value = ''; filterHelpSections(''); }
+}
+
+document.getElementById('helpCloseBtn').addEventListener('click', closeHelpModal);
+document.getElementById('helpBackdrop').addEventListener('click', closeHelpModal);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !document.getElementById('helpModal').classList.contains('hidden')) {
+    closeHelpModal();
+  }
+});
+
+// Accordion toggle
+document.querySelectorAll('.help-section-btn').forEach(btn => {
+  btn.addEventListener('click', function () {
+    const body     = this.nextElementSibling;
+    const expanded = this.getAttribute('aria-expanded') === 'true';
+    this.setAttribute('aria-expanded', String(!expanded));
+    body.hidden = expanded;
+  });
+});
+
+// Search
+document.getElementById('helpSearch').addEventListener('input', function () {
+  filterHelpSections(this.value.trim().toLowerCase());
+});
+
+function filterHelpSections(q) {
+  const sections = document.querySelectorAll('.help-section');
+  let anyVisible = false;
+
+  sections.forEach(section => {
+    if (!q) {
+      section.style.display = '';
+      return;
+    }
+    const keywords = (section.dataset.keywords || '').toLowerCase();
+    const text     = section.textContent.toLowerCase();
+    const match    = keywords.includes(q) || text.includes(q);
+    section.style.display = match ? '' : 'none';
+    if (match) {
+      anyVisible = true;
+      const sBtn = section.querySelector('.help-section-btn');
+      if (sBtn && sBtn.getAttribute('aria-expanded') !== 'true') {
+        sBtn.setAttribute('aria-expanded', 'true');
+        sBtn.nextElementSibling.hidden = false;
+      }
+    }
+  });
+
+  let noRes = document.getElementById('helpNoResults');
+  if (!noRes) {
+    noRes = document.createElement('div');
+    noRes.id = 'helpNoResults';
+    noRes.className = 'help-no-results';
+    noRes.textContent = 'Nič ne najdem. Poskusi z drugimi besedami. 🙈';
+    document.getElementById('helpBody').appendChild(noRes);
+  }
+  noRes.style.display = q && !anyVisible ? '' : 'none';
+}
+
+// Reset All Settings
+document.getElementById('resetAllBtn').addEventListener('click', () => {
+  localStorage.removeItem(TITLE_KEY);
+  localStorage.removeItem(TITLE_STYLE_KEY);
+  const titleEl = document.getElementById('appTitle');
+  titleEl.textContent = DEFAULT_TITLE;
+  applyTitleStyle(DEFAULT_STYLE);
+  document.title = 'Maruša Reminder';
+
+  applyTheme('marusa', null);
+  localStorage.setItem(THEME_KEY, 'marusa');
+  localStorage.removeItem(THEME_CUSTOM_KEY);
+
+  localStorage.removeItem(MODE_KEY);
+  setMode('smart');
+
+  const btn  = document.getElementById('resetAllBtn');
+  const orig = btn.textContent;
+  btn.textContent = '✓ Nastavitve ponastavljene';
+  setTimeout(() => { btn.textContent = orig; }, 2200);
+});
+
+// ── Theme ─────────────────────────────────────────────────────
+
 const THEME_KEY        = 'marusa_theme';
 const THEME_CUSTOM_KEY = 'marusa_theme_custom';
 
@@ -2025,6 +2210,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 
 (async function init() {
   loadSavedTheme();
+  loadSavedTitle();
 
   // Default reminder time: tomorrow at 09:00
   const d = new Date();

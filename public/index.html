@@ -46,8 +46,31 @@
   <div class="app">
 
     <header>
-      <h1>🌸 Maruša Reminder</h1>
-      <p class="subtitle">Ne pozabi follow-upa.</p>
+      <div class="header-title-wrap">
+        <span class="title-flower" aria-hidden="true">🌸</span>
+        <h1 id="appTitle" class="title-classic">Maruša Reminder</h1>
+      </div>
+      <p class="subtitle" id="appSubtitle">Ne pozabi follow-upa.</p>
+      <button id="editTitleBtn" class="btn-edit-title" title="Preimenuj aplikacijo" aria-label="Preimenuj aplikacijo">✏</button>
+
+      <!-- Title editor — shown when editing -->
+      <div id="titleEditor" class="title-editor hidden">
+        <input type="text" id="titleInput" class="title-input" maxlength="40"
+               placeholder="Npr. Moj opomnik 🌱 ali Brain Backup" autocomplete="off" />
+        <div class="title-style-row">
+          <button class="btn-title-style active" data-style="classic" title="Klasičen serif">Klasičen</button>
+          <button class="btn-title-style" data-style="cozy" title="Mehka poševnica">Prijetno</button>
+          <button class="btn-title-style" data-style="gradient" title="Barvni prehod">Barvno</button>
+          <button class="btn-title-style" data-style="minimal" title="Čisto in moderno">Minimalno</button>
+          <button class="btn-title-style" data-style="fun" title="Pogumno in zabavno">Zabavno</button>
+        </div>
+        <div class="title-editor-preview" id="titleEditorPreview">🌸 Maruša Reminder</div>
+        <div class="title-editor-actions">
+          <button id="saveTitleBtn" class="btn-primary">Shrani ime</button>
+          <button id="cancelTitleBtn" class="btn-secondary">Prekliči</button>
+        </div>
+      </div>
+
       <button id="lockBtn" class="btn-lock hidden" title="Zakleni aplikacijo">Zakleni aplikacijo</button>
     </header>
 
@@ -57,58 +80,7 @@
       <div class="mode-switch">
         <button class="mode-btn" id="modeSmartBtn">Pametni način</button>
         <button class="mode-btn" id="modeManualBtn">Ročni način</button>
-        <button class="btn-help" id="helpBtn" aria-label="Pomoč">?</button>
-      </div>
-
-      <!-- Help card -->
-      <div id="helpCard" class="help-card hidden">
-        <p><strong>Pametni način</strong> — Prilepi mail ali sporočilo. Maruša bo poiskala datum in pripravila opomnik.</p>
-        <p><strong>Ročni način</strong> — Vnesi naslov, datum in email ročno.</p>
-        <p><strong>Opomni me prej</strong> — Nastavlja, koliko pred rokom boš opomnik dobil/a.</p>
-        <p><strong>Razberi opomnik</strong> — Pripravi podatke iz besedila. Nič se še ne shrani.</p>
-        <p><strong>Shrani opomnik</strong> — Shrani in ob nastavljenem času pošlje email.</p>
-        <div class="help-note">Opomniki delujejo samo, ko Node.js strežnik teče (<code>npm start</code>).</div>
-        <div class="help-test">
-          <p class="help-test-hint">Preveri ali email pošiljanje deluje pravilno.</p>
-          <button id="testEmailBtn" class="btn-secondary help-test-btn">Pošlji testni Gmail</button>
-          <div id="testEmailMsg" class="message hidden"></div>
-        </div>
-        <div class="help-theme">
-          <div class="help-theme-title">Tema</div>
-          <div class="theme-presets">
-            <button class="btn-theme" data-theme="marusa">Maruša</button>
-            <button class="btn-theme" data-theme="forest">Gozd</button>
-            <button class="btn-theme" data-theme="night">Noč</button>
-          </div>
-          <div class="theme-custom-controls">
-            <div class="theme-color-row">
-              <span class="theme-color-label">Poudarek</span>
-              <input type="color" id="customAccent" class="theme-color-input" value="#c96a4a" />
-            </div>
-            <div class="theme-color-row">
-              <span class="theme-color-label">Ozadje</span>
-              <input type="color" id="customBg" class="theme-color-input" value="#f9f5f0" />
-            </div>
-            <div class="theme-color-row">
-              <span class="theme-color-label">Kartica</span>
-              <input type="color" id="customSurface" class="theme-color-input" value="#ffffff" />
-            </div>
-          </div>
-          <button id="resetThemeBtn" class="btn-small theme-reset-btn">Ponastavi temo</button>
-        </div>
-        <div class="help-notif">
-          <div class="help-notif-title">🔔 Browser obvestila</div>
-          <div id="notifStatus" class="notif-status">Dovoli browser obvestila za hitre opomnike.</div>
-          <button id="notifRequestBtn" class="btn-secondary help-test-btn">Omogoči obvestila</button>
-        </div>
-        <div class="help-errors">
-          <div class="help-errors-title">Napake / kaj preveriti</div>
-          <div class="help-error-row"><span class="help-err-code">ERR-001</span> Napačna koda za dostop — preveri APP_ACCESS_CODE v Render.</div>
-          <div class="help-error-row"><span class="help-err-code">ERR-002/003</span> Resend ne deluje — preveri RESEND_API_KEY in MAIL_FROM v Render.</div>
-          <div class="help-error-row"><span class="help-err-code">ERR-010</span> App ni posodobljena — Render → Manual Deploy.</div>
-          <div class="help-error-row"><span class="help-err-code">ERR-012</span> App se zbuja (Render Free) — počakaj 30–60 sekund.</div>
-          <div class="help-error-row"><span class="help-err-code">ERR-014</span> Datum ni bil prepoznan — izberi datum ročno.</div>
-        </div>
+        <button class="btn-help" id="helpBtn" aria-label="Pomoč in nastavitve" title="Kaj vse znam? ✨">Pomoč ✨</button>
       </div>
 
       <!-- Smart Paste section -->
@@ -310,6 +282,337 @@
     <span>🗑 Opomnik izbrisan.</span>
     <button class="btn-undo" id="undoBtn">Razveljavi</button>
   </div>
+
+  <!-- ── Help Modal ──────────────────────────────────────────── -->
+  <div id="helpModal" class="help-modal-overlay hidden" role="dialog" aria-modal="true" aria-label="Pomoč in nastavitve">
+    <div class="help-modal-backdrop" id="helpBackdrop"></div>
+    <div class="help-modal-drawer">
+      <div class="help-modal-top">
+        <div class="help-modal-handle"></div>
+        <div class="help-modal-header">
+          <span class="help-modal-emoji">✨</span>
+          <h2 class="help-modal-title">Kaj vse znam?</h2>
+          <button class="help-modal-close" id="helpCloseBtn" aria-label="Zapri pomoč">✕</button>
+        </div>
+        <div class="help-search-wrap">
+          <input type="search" id="helpSearch" class="help-search-input"
+                 placeholder="Išči po vsebini…" autocomplete="off" />
+        </div>
+      </div>
+
+      <div class="help-modal-body" id="helpBody">
+
+        <!-- 1: O Maruši -->
+        <div class="help-section" data-keywords="maruša kaj je aplikacija opomnik reminder podatki strežnik">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">ℹ️</span>
+            <span class="help-section-title">O Maruši</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Maruša je tvoj osebni opomnik. Ob nastavljenem času ti pošlje email — za follow-upe, roke, sestanke, plačila in vse, kar je sicer pozabiti. 🌸</p>
+            <p>Ni oblaka, ni registracije, ni sledenja. Podatki živijo na strežniku pri tebi.</p>
+            <p><strong>Kaj zna:</strong></p>
+            <ul>
+              <li>Razberemo datum iz sporočila ali maila (slovensko + angleško)</li>
+              <li>Pošlje email ob točnem času</li>
+              <li>Browser obvestilo, ko je zavihek odprt</li>
+              <li>Nadaljnji opomnik (follow-up), če ni odgovora</li>
+              <li>Zapis in iskanje opomnikov, pin, brisanje z razveljavitvijo</li>
+            </ul>
+            <p><strong>Kaj ne zna:</strong></p>
+            <ul>
+              <li>Delovati brez strežnika (<code>npm start</code> ali Render)</li>
+              <li>Pošiljati browser obvestil brez odprtega zavihka</li>
+              <li>Brati zaprtih emailov ali SMS-ov — samo to, kar prilepiš</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 2: Pametni način -->
+        <div class="help-section" data-keywords="pametni razberi parser sporočilo mail besedilo zaupanje confidence predogled preview">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🧠</span>
+            <span class="help-section-title">Pametni način</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Prilepi mail, SMS ali sporočilo — Maruša bo skušala razbrati datum, uro in naslov opomnika.</p>
+            <ol>
+              <li>Prilepi besedilo v polje</li>
+              <li>Nastavi <em>Opomni me prej</em> (privzeto: 1 dan)</li>
+              <li>Klikni <strong>Razberi opomnik</strong></li>
+              <li>Preveri predogled — je datum pravi?</li>
+              <li>Klikni <strong>Shrani opomnik</strong> ali <strong>✏ Uredi</strong>, če ni točno prav</li>
+            </ol>
+            <p><strong>Stopnje zaupanja:</strong></p>
+            <div class="help-conf-row"><span class="help-conf-dot green"></span> <strong>Zelo zanesljivo</strong> — jasen datum in ura, verjetno točno</div>
+            <div class="help-conf-row"><span class="help-conf-dot yellow"></span> <strong>Mogoče napačen datum</strong> — preveri pred shranjevanjem</div>
+            <div class="help-conf-row"><span class="help-conf-dot red"></span> <strong>Datum ni jasen</strong> — vnesi ročno v obrazec</div>
+            <p class="help-tip">💡 Parser je čisto brez AI — samo pametni vzorci. Če besedilo ni v slovenščini ali angleščini, bo morda zgrešil datum. V tem primeru raje Ročni način.</p>
+          </div>
+        </div>
+
+        <!-- 3: Ročni način -->
+        <div class="help-section" data-keywords="ročni obrazec naslov datum email quick hitri gumb chip uredi">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">✏️</span>
+            <span class="help-section-title">Ročni način</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Klasičen obrazec — vnesi kar sam/a.</p>
+            <p><strong>Hitri gumbi</strong> (Danes ob 12, Jutri ob 9…) nastavijo datum s klikom.</p>
+            <p><strong>Hitri datum</strong> — polje sprejme naravni jezik:</p>
+            <div class="help-examples">
+              <span class="help-ex">jutri ob 9</span>
+              <span class="help-ex">naslednji petek ob 14</span>
+              <span class="help-ex">next Monday at 10</span>
+              <span class="help-ex">čez 3 dni</span>
+              <span class="help-ex">konec meseca</span>
+            </div>
+            <p><strong>Edit čipi</strong> (+1h, +2h, Jutri…) prilagodijo že nastavljen datum — priročno za drobne spremembe.</p>
+            <p><strong>Nadaljnji opomnik</strong> — nastavi ga v istem obrazcu. Maruša bo po nastavljenem zamiku poslala še eno spomnilo, da preveriš status.</p>
+            <p><strong>Zapomni si email</strong> — z oznako shrani email v brskalniku. Ne bo treba vpisovati vsakič.</p>
+          </div>
+        </div>
+
+        <!-- 4: Datumski izrazi -->
+        <div class="help-section" data-keywords="datum čas izrazi slovensko angleško parser petek ponedeljek mesec teden ura jutri danes">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">📅</span>
+            <span class="help-section-title">Podprti datumski izrazi</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p><strong>Slovensko:</strong></p>
+            <div class="help-examples">
+              <span class="help-ex">danes</span>
+              <span class="help-ex">jutri</span>
+              <span class="help-ex">pojutrišnjem</span>
+              <span class="help-ex">naslednji petek</span>
+              <span class="help-ex">naslednji ponedeljek ob 10</span>
+              <span class="help-ex">čez 3 dni</span>
+              <span class="help-ex">čez 2 tedna</span>
+              <span class="help-ex">konec meseca</span>
+              <span class="help-ex">konec tedna</span>
+              <span class="help-ex">do petka ob 12</span>
+              <span class="help-ex">najkasneje do ponedeljka</span>
+              <span class="help-ex">v 5 dneh</span>
+              <span class="help-ex">v roku 2 tednov</span>
+              <span class="help-ex">prvi ponedeljek naslednji mesec</span>
+              <span class="help-ex">zadnji petek v mesecu</span>
+              <span class="help-ex">čez pol ure</span>
+              <span class="help-ex">čez 2 uri</span>
+              <span class="help-ex">15. maja</span>
+              <span class="help-ex">15.5.2026</span>
+            </div>
+            <p><strong>Angleško:</strong></p>
+            <div class="help-examples">
+              <span class="help-ex">today</span>
+              <span class="help-ex">tomorrow</span>
+              <span class="help-ex">next Friday at 3pm</span>
+              <span class="help-ex">end of month</span>
+              <span class="help-ex">end of week</span>
+              <span class="help-ex">in 3 days</span>
+              <span class="help-ex">within 2 weeks</span>
+              <span class="help-ex">first Monday next month</span>
+              <span class="help-ex">last Friday of the month</span>
+              <span class="help-ex">no later than Thursday</span>
+              <span class="help-ex">in 2 hours</span>
+              <span class="help-ex">by end of day</span>
+              <span class="help-ex">May 15</span>
+            </div>
+            <p class="help-tip">💡 Brez ure Maruša privzame <strong>9:00 zjutraj</strong>. Rok brez časa (konec meseca, konec tedna) dobi <strong>17:00</strong>.</p>
+          </div>
+        </div>
+
+        <!-- 5: Email opomniki -->
+        <div class="help-section" data-keywords="email pošto gmail resend pošiljanje strežnik follow-up nadaljnji opomnik test">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">📧</span>
+            <span class="help-section-title">Email opomniki</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Ob nastavljenem času strežnik pošlje email na tvoj naslov. Enostavno.</p>
+            <p class="help-warn">⚠️ Strežnik mora teči. Brez <code>npm start</code> ali Render opomniki <strong>ne delujejo</strong> — email ne pride.</p>
+            <p><strong>Podprti ponudniki (konfigurira admin v .env):</strong></p>
+            <ul>
+              <li><strong>Resend</strong> — priporočeno za Render; HTTPS, zanesljivo, brez SMTP</li>
+              <li><strong>Gmail SMTP</strong> — za lokalno rabo; potrebuješ Gmail app password</li>
+            </ul>
+            <p><strong>Nadaljnji opomnik (follow-up):</strong><br/>
+            Nastavi ga v obrazcu (npr. "Čez 1 dan"). Ko poteče, Maruša pošlje še eno spomnilo — koristno za follow-upe na emails, ki niso dobili odgovora.</p>
+            <div class="help-test">
+              <p class="help-test-hint">Preveri, ali email pošiljanje deluje:</p>
+              <button id="testEmailBtn" class="btn-secondary help-test-btn">Pošlji testni email</button>
+              <div id="testEmailMsg" class="message hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6: Browser obvestila -->
+        <div class="help-section" data-keywords="obvestila browser notifikacije push zvonec dovoli chrome android safari">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🔔</span>
+            <span class="help-section-title">Browser obvestila</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Ko pride čas za opomnik, te Maruša opozori z browser obvestilom — <em>če imaš zavihek odprt</em>.</p>
+            <p>To je <strong>dodatek</strong> k emailu, ne nadomestilo. Email pride vedno (ko server teče); browser obvestilo pride samo z odprtim zavihkom.</p>
+            <p><strong>Omejitve:</strong></p>
+            <ul>
+              <li>Zavihek mora biti odprt (ali v ozadju)</li>
+              <li>Brskalnik mora imeti dovoljenje za obvestila</li>
+              <li>iPhone Safari ne podpira push obvestil (Android Chrome deluje)</li>
+            </ul>
+            <div class="help-notif">
+              <div id="notifStatus" class="notif-status">Dovoli browser obvestila za hitre opomnike.</div>
+              <button id="notifRequestBtn" class="btn-secondary help-test-btn">Omogoči obvestila</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 7: Teme & barve -->
+        <div class="help-section" data-keywords="tema barve barvna shema maruša gozd noč dark mode poudarek ozadje kartica">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🎨</span>
+            <span class="help-section-title">Teme & barve</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Tri prednastavitve ali pa naredí svojo kombinacijo.</p>
+            <div class="help-theme">
+              <div class="theme-presets">
+                <button class="btn-theme" data-theme="marusa">🌸 Maruša</button>
+                <button class="btn-theme" data-theme="forest">🌿 Gozd</button>
+                <button class="btn-theme" data-theme="night">🌙 Noč</button>
+              </div>
+              <div class="theme-custom-controls">
+                <div class="theme-color-row">
+                  <span class="theme-color-label">Poudarek</span>
+                  <input type="color" id="customAccent" class="theme-color-input" value="#c96a4a" />
+                </div>
+                <div class="theme-color-row">
+                  <span class="theme-color-label">Ozadje</span>
+                  <input type="color" id="customBg" class="theme-color-input" value="#f9f5f0" />
+                </div>
+                <div class="theme-color-row">
+                  <span class="theme-color-label">Kartica</span>
+                  <input type="color" id="customSurface" class="theme-color-input" value="#ffffff" />
+                </div>
+              </div>
+              <button id="resetThemeBtn" class="btn-small theme-reset-btn">Ponastavi temo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 8: Render Free -->
+        <div class="help-section" data-keywords="render free spanje sleep budilka počasen err-012 ERR-012 30 sekund slow server">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">💤</span>
+            <span class="help-section-title">Render Free & budilka</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Maruša je brezplačno gostovana na <strong>Render Free</strong>. Ta po 15 minutah neaktivnosti <em>zaspi</em>.</p>
+            <p>Ko jo odpreš po daljši pavzi, se bo morda zbudila 30–60 sekund. To je normalno — ni pokvarjeno. 😴</p>
+            <p><code>ERR-012</code> ti pove, da se strežnik zbuja. Počakaj malce in poskusi znova.</p>
+            <p><strong>Možne rešitve:</strong></p>
+            <ul>
+              <li>Počakaj 30–60 sekund in osvežite stran</li>
+              <li>Nadgradi na Render Starter (plačljivo) — strežnik ne spi</li>
+              <li>Gosti lokalno z <code>npm start</code> — takrat strežnik teče toliko časa, kolikor je računalnik vklopljen</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 9: PWA & mobilno -->
+        <div class="help-section" data-keywords="pwa namestitev mobilno telefon android iphone safari chrome aplikacija ikona zaslon">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">📱</span>
+            <span class="help-section-title">Namestitev & mobilna raba</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Maruša se da namestiti kot aplikacija (PWA — Progressive Web App):</p>
+            <ul>
+              <li><strong>Android (Chrome):</strong> ⋮ meni → <em>Dodaj na začetni zaslon</em></li>
+              <li><strong>iPhone (Safari):</strong> tipka Deli → <em>Dodaj na začetni zaslon</em></li>
+              <li><strong>Namizje (Chrome/Edge):</strong> ikona za namestitev v naslovni vrstici</li>
+            </ul>
+            <p>Po namestitvi deluje kot prava aplikacija — brez brskalniške vrstice, s polnim zaslonom.</p>
+            <p><strong>Mobilni nasveti:</strong></p>
+            <ul>
+              <li>Pametni način: kopiraj mail → prilepi → opomnik v 10 sekundah 🚀</li>
+              <li>Na iPhonu Safari browser obvestila niso podprta — email vseeno pride</li>
+              <li>Zaslon se prilagodi vsem velikostim</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 10: Zasebnost -->
+        <div class="help-section" data-keywords="zasebnost podatki storage lokalno račun sledenje privacy varnost">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🔒</span>
+            <span class="help-section-title">Zasebnost & podatki</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Maruša ne zbira podatkov, nima analitike, ne zahteva registracije in ne pozna pojma "oblak".</p>
+            <p><strong>V brskalniku (localStorage) shrani:</strong></p>
+            <ul>
+              <li>Tvoj email (samo če je označeno "Zapomni si")</li>
+              <li>Izbrana tema in po meri narejene barve</li>
+              <li>Ime in slog aplikacije (če si ga spremenila)</li>
+              <li>Nastavitve načina (pametni/ročni)</li>
+            </ul>
+            <p><strong>Na strežniku (reminders.json):</strong></p>
+            <ul>
+              <li>Tvoji opomniki — naslov, datum, email</li>
+              <li>Niso v oblaku, niso deljeni, so osebna datoteka</li>
+            </ul>
+            <p class="help-tip">💡 Obrišeš lokalne podatke: Brskalnik → Nastavitve → Počisti podatke spletnega mesta.</p>
+          </div>
+        </div>
+
+        <!-- 11: Napake -->
+        <div class="help-section" data-keywords="napake error err koda odpravljanje smtp gmail resend ERR 001 002 003 010 012 014 016">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🔧</span>
+            <span class="help-section-title">Napake & odpravljanje</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <div class="help-errors">
+              <div class="help-error-row"><span class="help-err-code">ERR-001</span> Napačna koda za dostop — preveri <code>APP_ACCESS_CODE</code> v Render.</div>
+              <div class="help-error-row"><span class="help-err-code">ERR-002/003</span> Resend ne deluje — preveri <code>RESEND_API_KEY</code> in <code>MAIL_FROM</code> v Render.</div>
+              <div class="help-error-row"><span class="help-err-code">ERR-010</span> App ni posodobljena — Render → Manual Deploy.</div>
+              <div class="help-error-row"><span class="help-err-code">ERR-012</span> App se zbuja (Render Free) — počakaj 30–60 sekund in poskusi znova.</div>
+              <div class="help-error-row"><span class="help-err-code">ERR-014</span> Datum ni bil prepoznan — izberi datum ročno v obrazcu.</div>
+              <div class="help-error-row"><span class="help-err-code">ERR-016</span> Preveč zahtev — počakaj 15 minut in poskusi znova.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 12: Nastavitve & ponastavi -->
+        <div class="help-section" data-keywords="nastavitve ponastavi reset ime aplikacije title settings">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">⚙️</span>
+            <span class="help-section-title">Nastavitve & ponastavi</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Povrni vse na privzeto: ime aplikacije, temo, barve in način.</p>
+            <button id="resetAllBtn" class="btn-secondary help-reset-all-btn">↺ Ponastavi vse nastavitve</button>
+          </div>
+        </div>
+
+      </div><!-- /help-modal-body -->
+    </div><!-- /help-modal-drawer -->
+  </div><!-- /help-modal-overlay -->
 
   <script src="/app.js"></script>
 </body>
