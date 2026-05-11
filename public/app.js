@@ -197,16 +197,23 @@ const SIGNATURE_RE = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards
 const ACTION_WORDS = ['pokliči','poklic','pošlji','posreduj','preveri','preglej','pripravi','oddaj','pošljite','sestanek','meeting','call','send','submit','check','review','prepare'];
 
 const BUSINESS_KEYWORDS = [
-  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,           label: 'račun' },
-  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,       label: 'plačilo' },
-  { re: /\bdobavnic|\bdelivery note\b/i,                       label: 'dobavnica' },
-  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,        label: 'ponudba' },
-  { re: /\bnaročiln|\border confirmation\b/i,                 label: 'naročilnica' },
-  { re: /\bddv\b|\bvat\b/i,                                   label: 'DDV' },
-  { re: /\bfollow.?up\b/i,                                    label: 'follow-up' },
-  { re: /\bknjig|\baccounting\b/i,                            label: 'računovodstvo' },
-  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                 label: 'stranka' },
-  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,              label: 'dobavitelj' },
+  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,                              label: 'račun' },
+  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,                          label: 'plačilo' },
+  { re: /\bdobavnic|\bdelivery note\b/i,                                          label: 'dobavnica' },
+  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,                           label: 'ponudba' },
+  { re: /\bnaročiln|\border confirmation\b/i,                                    label: 'naročilnica' },
+  { re: /\bddv\b|\bvat\b/i,                                                      label: 'DDV' },
+  { re: /\bfollow.?up\b/i,                                                       label: 'follow-up' },
+  { re: /\bknjig|\baccounting\b/i,                                               label: 'računovodstvo' },
+  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                                    label: 'stranka' },
+  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,                                 label: 'dobavitelj' },
+  { re: /\bopomin\b/i,                                                            label: 'opomin' },
+  { re: /\bizvršb/i,                                                              label: 'izvršba' },
+  { re: /\bzapadl[ae]\s+obveznost|\boutstanding\s+(?:balance|invoice)\b/i,       label: 'zapadle obveznosti' },
+  { re: /\bneporavnan|\bneplačan\b/i,                                             label: 'neporavnano' },
+  { re: /\bzadnji\s+opomin\b|\bfinal\s+notice\b/i,                               label: 'zadnji opomin' },
+  { re: /\bpayment\s+reminder\b|\breminder\s+notice\b/i,                         label: 'opomnik plačila' },
+  { re: /\bcollection\s+notice\b|\blegal\s+action\b|\bdebt\s+collect/i,          label: 'izterjava' },
 ];
 
 const SL_DAYS = [
@@ -292,6 +299,10 @@ function extractTime(text) {
   if (/\bdopoldne\b/.test(lower))                                                          return { hour:  9, minute: 0 };
   if (/\bpopoldne\b|\bafternoon\b/.test(lower))                                            return { hour: 14, minute: 0 };
   if (/\bzvečer\b|\bevening\b|\btonight\b/.test(lower))                                    return { hour: 18, minute: 0 };
+
+  // Urgent/ASAP without explicit time → end of working day
+  if (/\btakoj\b|\bčim prej\b|\b(?:as\s+soon\s+as\s+possible|asap)\b|\burgentno\b|\bnujno\b|\bimmediately\b/.test(lower))
+    return { hour: 17, minute: 0 };
 
   return null;
 }
@@ -444,6 +455,30 @@ function extractDate(text) {
     }
   }
 
+  // ── Payment / deadline relative phrases ────────────────────────────────────
+  // "v roku X tednov / enega tedna / dveh tednov"
+  const SL_ORD = { 'enega':1,'enem':1,'dveh':2,'dvema':2,'treh':3,'štirih':4,'petih':5,'šestih':6,'sedmih':7,'osmih':8,'devetih':9,'desetih':10,'petnajstih':15,'trideset':30,'tridesetih':30 };
+  const vRokuTedW = lower.match(/\bv\s+roku\s+(\w+)\s+tede?n/);
+  if (vRokuTedW) { const weeks = SL_ORD[vRokuTedW[1]] || parseInt(vRokuTedW[1]) || 1; const d = new Date(today); d.setDate(d.getDate() + weeks * 7); return { date: d, tier: 'deadline' }; }
+  const vTednih = lower.match(/\bv\s+(?:roku\s+)?(\d+)\s+tede?n/);
+  if (vTednih) { const d = new Date(today); d.setDate(d.getDate() + parseInt(vTednih[1]) * 7); return { date: d, tier: 'deadline' }; }
+
+  // "v 5 dneh" / "v roku 5 dni" / "najkasneje v 5 dneh" (numeric)
+  const vDnehNum = lower.match(/\bv\s+(?:roku\s+)?(\d+)\s+dn/);
+  if (vDnehNum) { const d = new Date(today); d.setDate(d.getDate() + parseInt(vDnehNum[1])); return { date: d, tier: 'deadline' }; }
+  // "v petih dneh" / "v roku osmih dni" (Slovenian word-numbers)
+  const vDnehWord = lower.match(/\bv\s+(?:roku\s+)?(\w+)\s+dn/);
+  if (vDnehWord && SL_ORD[vDnehWord[1]] !== undefined) { const d = new Date(today); d.setDate(d.getDate() + SL_ORD[vDnehWord[1]]); return { date: d, tier: 'deadline' }; }
+
+  // English "within X days/weeks"
+  const EN_ORD_W = { 'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'fourteen':14,'fifteen':15,'thirty':30 };
+  const withinDays = lower.match(/\bwithin\s+(\d+)\s+days?\b/);
+  if (withinDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(withinDays[1])); return { date: d, tier: 'deadline' }; }
+  const withinDaysW = lower.match(/\bwithin\s+(one|two|three|four|five|six|seven|eight|nine|ten|fourteen|fifteen|thirty)\s+days?\b/);
+  if (withinDaysW && EN_ORD_W[withinDaysW[1]]) { const d = new Date(today); d.setDate(d.getDate() + EN_ORD_W[withinDaysW[1]]); return { date: d, tier: 'deadline' }; }
+  const withinWeeks = lower.match(/\bwithin\s+(\d+)\s+weeks?\b/);
+  if (withinWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(withinWeeks[1]) * 7); return { date: d, tier: 'deadline' }; }
+
   // Combined: "naslednji teden v petek" / "next week Friday" — MUST precede generic "naslednji teden"
   if (/naslednji teden|prihodnji teden|drug teden/.test(lower)) {
     for (const [re, dayNum] of SL_DAYS) {
@@ -517,6 +552,10 @@ function extractDate(text) {
   if (/konec dneva|do konca dneva|\beod\b|\bcob\b|end of (?:the )?day/.test(lower))
     return relative(new Date(today));
 
+  // Urgent/ASAP with no explicit date → today (time set to 17:00 by extractTime)
+  if (/\btakoj\b|\bčim prej\b|\b(?:as\s+soon\s+as\s+possible|asap)\b|\burgentno\b|\bnujno\b|\bimmediately\b/.test(lower))
+    return relative(new Date(today));
+
   return { date: null, tier: null };
 }
 
@@ -549,6 +588,12 @@ function stripDeadlineTail(text) {
     .replace(/\s*\bthank you\b.*$/i, '')
     .replace(/\s*\b(?:do\s+(?:danes|jutri|petka|srede|torka|četrtka|sobote|nedelje|konca|naslednjega)|by\s+(?:today|tomorrow|friday|monday|tuesday|wednesday|thursday|saturday|sunday|end|the\s+end))\b.*$/i, '')
     .replace(/\s*\bnajkasnej(?:e|š[ae])\b.*$/i, '')
+    .replace(/\s*\boziroma\s+najkasnej\w*\b.*$/i, '')
+    .replace(/\s*\bod\s+prejema\b.*$/i, '')
+    .replace(/\s*\bv\s+(?:roku\s+)?\d+\s+dn\w*\b.*$/i, '')
+    .replace(/\s*\bwithin\s+\d+\s+days?\b.*$/i, '')
+    .replace(/\s*\bčim prej\b.*$/i, '')
+    .replace(/\s*,?\s*(?:čim prej|takoj|asap|urgentno|nujno)\s*$/i, '')
     .replace(/\s*[,.]$/, '')
     .trim();
 }
@@ -588,10 +633,22 @@ function stripDateTimePhrases(text) {
     .replace(/\b(?:tomorrow|today|tonight)\b/gi, '')
     .replace(/\bin\s+\w+\s+(?:days?|weeks?|hours?|minutes?)\b/gi, '')
     .replace(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    // Deadline / payment phrases
+    .replace(/\bv\s+roku\s+\w+\s+\w+\b/gi, '')          // v roku petih dni / v roku dveh tednov
+    .replace(/\bv\s+(?:roku\s+)?\d+\s+\w+(?:\s+od\b.*)?/gi, '')  // v 5 dneh (od prejema...)
+    .replace(/\bwithin\s+(?:\d+|\w+)\s+\w+\b/gi, '')    // within 5 days / within five days
+    .replace(/\bnajkasneje\s+v\b[^,.]*/gi, '')           // najkasneje v 5 dneh...
+    .replace(/\bnajkasneje\b/gi, '')
+    .replace(/\boziroma\b/gi, '')
+    .replace(/\bčim prej\b/gi, '')
+    .replace(/\btakoj\b/gi, '')
+    .replace(/\b(?:urgentno|nujno|asap)\b/gi, '')
     .replace(/\s{2,}/g, ' ')
     .replace(/^\s*[,.\-–]\s*/, '')
     .trim();
 }
+
+const BUSINESS_FILLER_RE = /^(?:prosimo,?\s*(?:da\s*|za\s*)?|pričakujemo\s*(?:plačilo\s*|odgovor\s*)?|please\s+(?:pay|settle|send|reply|respond|submit|review|note|be\s+advised)\s*(?:the\s+)?|kindly\s*(?:note\s*)?|note\s+that\s*)/i;
 
 function extractTitle(text, businessContext) {
   const cleaned = text.replace(SIGNATURE_RE, '').trim();
@@ -603,9 +660,16 @@ function extractTitle(text, businessContext) {
   const FILLER_START = /^(?:vesela bom[,.]?\s*(?:če\s*se\s*vidimo\.?)?|prosim\b|hvala\b|thank you\b)\s*/i;
   const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
 
-  // For short single-line inputs, strip date/time phrases to extract the core noun
+  // For short single-line inputs, strip date/time and business boilerplate to get the core noun
   if (lines.length === 1) {
-    const stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    let stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    stripped = stripped.replace(BUSINESS_FILLER_RE, '').trim();
+    stripped = stripDeadlineTail(stripped);
+    // Short action-verb result + "regarding X" in original → use X as subject
+    if (stripped.length < 8 && /^(?:reply|respond|answer|submit|check)\s*$/i.test(stripped)) {
+      const reg = lines[0].match(/\bregarding\s+(.{3,50}?)(?:\s+within\b|\.|,|$)/i);
+      if (reg) stripped = reg[1].trim();
+    }
     if (stripped.length >= 2 && !SKIP_RE.test(stripped)) {
       const t = stripped.charAt(0).toUpperCase() + stripped.slice(1);
       return t.slice(0, 80);
@@ -617,6 +681,7 @@ function extractTitle(text, businessContext) {
     if (t.length < 4) continue;
     if (SKIP_RE.test(t)) continue;
     t = t.replace(FILLER_START, '').trim();
+    t = t.replace(BUSINESS_FILLER_RE, '').trim();
     if (t.length < 4) continue;
     // Strip leading date prefix: "27.5.2026 "
     t = t.replace(/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\s+/, '');
@@ -710,7 +775,9 @@ function parseSmartReminderText(text, offset) {
   );
 
   let confidence, confidenceReason;
-  if (tier === 'exact' && timeResult) {
+  if (tier === 'deadline') {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen rok (plačilni/odgovorni rok).';
+  } else if (tier === 'exact' && timeResult) {
     confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
   } else if ((tier === 'relative' || tier === 'weekday') && timeResult) {
     confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
