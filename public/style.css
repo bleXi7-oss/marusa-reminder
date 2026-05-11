@@ -910,6 +910,78 @@ input.theme-color-input {
 /* ── Pinned reminder card ────────────────────────────────────── */
 .reminder-card.pinned { border-left: 3px solid var(--accent); }
 
+/* ── Confidence indicator ───────────────────────────────────── */
+.confidence-indicator {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  animation: fadeIn 0.18s ease;
+}
+
+.conf-green  { background: var(--green-lt);  border-color: rgba(74,156,106,0.3);  color: var(--green);  }
+.conf-yellow { background: var(--amber-lt);  border-color: rgba(201,127,46,0.3);  color: var(--amber);  }
+.conf-red    { background: var(--accent-lt); border-color: rgba(201,106,74,0.3);  color: var(--accent); }
+
+.conf-icon  { font-size: 0.72rem; flex-shrink: 0; }
+.conf-label { font-weight: 600; flex-shrink: 0; }
+
+[data-theme="night"] .conf-green  { background: #1a3322; border-color: #2d5040; color: #5ec882; }
+[data-theme="night"] .conf-yellow { background: #2a2010; border-color: #7a5020; color: #d4a85a; }
+
+/* ── Edit chips (relative datetime adjustments) ─────────────── */
+.edit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.btn-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-chip:hover {
+  background: var(--accent-lt);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.preview-mode .edit-chips { display: none; }
+
+/* ── Quick date helper ──────────────────────────────────────── */
+.quick-date-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.quick-date-row input { flex: 1; }
+
+.quick-date-btn {
+  flex-shrink: 0;
+  padding: 11px 16px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.preview-mode .quick-date-field { display: none; }
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }

@@ -79,13 +79,34 @@
 - [ ] **Shrani opomnik** shrani opomnik
 - [ ] **Uredi** zapusti predogled in sprosti polja
 - [ ] Brez datuma → `ERR-014` + ročni vnos
+- [ ] Indikator zanesljivosti prikazan po parsiranju (🟢/🟡/🔴 + razlog)
+- [ ] "danes do 12h" → 🟢 Zelo zanesljivo
+- [ ] "naslednji teden" → 🟡 Mogoče napačen datum
+- [ ] Besedilo brez datuma → 🔴 Datum ni jasen
 
 ## 8. Ročni način
 
 - [ ] Direkten vnos naslova, opisa, datuma in emaila
-- [ ] Hitri gumbi delujejo (Čez 1 uro, Jutri ob 9, Čez 3 dni, Naslednji teden)
+- [ ] Hitri gumbi delujejo (Danes ob 12, Jutri ob 9, Petek ob 12, Naslednji teden)
+- [ ] **Čipi za urejanje** delujejo: +1h, +2h, Jutri, Petek, 09:00, 12:00, 17:00
+- [ ] Čipi posodabljajo datetime, timing preview in detect card
+- [ ] **Hitri datum** polje: "jutri ob 9" nastavi datum
+- [ ] **Hitri datum** polje: "next Friday at 12" nastavi datum
+- [ ] **Hitri datum** z neveljavnim besedilom → ERR-014 napaka
 - [ ] **Zapomni si moj email** shrani email v localStorage
 - [ ] Email se obnovi ob naslednjem obisku
+
+## 9b. Browser obvestila
+
+- [ ] Gumb **Omogoči obvestila** prikazan, ko dovoljenje ni dano
+- [ ] Po kliku brskalnik vpraša za dovoljenje
+- [ ] Po podelitvi dovoljenja se prikaže ✓ Obvestila omogočena
+
+## 9c. Undo brisanje
+
+- [ ] Brisanje opomnika prikaže toast (ni več `confirm()` dialoga)
+- [ ] Klik **Razveljavi** v 5 sekundah obnovi opomnik
+- [ ] Toast izgine po 5 sekundah
 
 ## 9. Mobilna/PWA namestitev
 

@@ -590,7 +590,7 @@ function parseSmartReminderText(text, offset) {
     const now = new Date();
     now.setSeconds(0, 0);
     now.setMinutes(now.getMinutes() + relMins);
-    return { title, eventDate: now, remindAt: now, description, confidence: 'high', warning: null, businessContext };
+    return { title, eventDate: now, remindAt: now, description, confidence: 'high', confidenceReason: 'Zaznano relativno besedilo z jasnim časom.', warning: null, businessContext };
   }
 
   let { date: rawDate, tier } = extractDate(text);
@@ -608,7 +608,7 @@ function parseSmartReminderText(text, offset) {
 
   if (!rawDate) {
     return {
-      title, eventDate: null, remindAt: null, description, confidence: 'none', businessContext,
+      title, eventDate: null, remindAt: null, description, confidence: 'none', confidenceReason: 'Datum ni bil zaznan.', businessContext,
       warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
     };
   }
@@ -620,19 +620,25 @@ function parseSmartReminderText(text, offset) {
     0, 0
   );
 
-  let confidence;
-  if      (tier === 'exact' && timeResult)           confidence = 'high';
-  else if (tier === 'exact' || tier === 'relative')  confidence = 'medium';
-  else if (tier === 'weekday')                       confidence = 'medium';
-  else                                               confidence = 'low';
+  let confidence, confidenceReason;
+  if (tier === 'exact' && timeResult) {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
+  } else if ((tier === 'relative' || tier === 'weekday') && timeResult) {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
+  } else if (tier === 'exact' || tier === 'relative' || tier === 'weekday') {
+    confidence = 'medium'; confidenceReason = 'Ura ni bila najdena, uporabljena je privzeta 09:00.';
+  } else {
+    confidence = 'low'; confidenceReason = 'Datum je ohlapno določen, preveri.';
+  }
 
   const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
+  if (multiDate) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
 
   return {
     title,
     eventDate,
     remindAt: applyReminderOffset(new Date(eventDate), offset),
-    description, confidence, warning, businessContext,
+    description, confidence, confidenceReason, warning, businessContext,
   };
 }
 
@@ -667,6 +673,17 @@ function updateDetectCard(eventDate, remindAt) {
   document.getElementById('detectReminderText').textContent = reminderLine;
 
   card.classList.remove('hidden');
+}
+
+function updateConfidenceIndicator(confidence, reason) {
+  const el = document.getElementById('confidenceIndicator');
+  if (!el) return;
+  if (!confidence) { el.classList.add('hidden'); return; }
+  const level  = confidence === 'high' ? 'green' : (confidence === 'medium' || confidence === 'low') ? 'yellow' : 'red';
+  const icons  = { green: '🟢', yellow: '🟡', red: '🔴' };
+  const labels = { green: 'Zelo zanesljivo', yellow: 'Mogoče napačen datum', red: 'Datum ni jasen' };
+  el.innerHTML = `<span class="conf-icon">${icons[level]}</span> <span class="conf-label">${labels[level]}</span>${reason ? ` — ${escHtml(reason)}` : ''}`;
+  el.className = `confidence-indicator conf-${level}`;
 }
 
 function updateTimingPreview() {
@@ -930,6 +947,8 @@ async function savePendingReminder() {
     document.getElementById('remindAt').value = toDatetimeLocalValue(nextDay);
     lastParsedEventDate = null;
     updateDetectCard(null);
+    updateConfidenceIndicator(null);
+    document.getElementById('quickDateInput').value = '';
     updateTimingPreview();
 
     showMessage(msg, '✓ Opomnik shranjen!', 'success');
@@ -1103,7 +1122,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     result = parseSmartReminderText(text, document.getElementById('smartOffset').value);
   }
 
-  const { title, eventDate, remindAt, description, confidence, warning } = result;
+  const { title, eventDate, remindAt, description, confidence, confidenceReason, warning } = result;
 
   document.getElementById('title').value       = title;
   document.getElementById('description').value = description;
@@ -1126,6 +1145,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     enterPreviewMode(eventDate, remindAt);
     lastParsedEventDate = new Date(eventDate);
     updateDetectCard(eventDate, remindAt);
+    updateConfidenceIndicator(confidence, confidenceReason);
     updateTimingPreview();
 
   } else {
@@ -1140,6 +1160,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
 
     lastParsedEventDate = null;
     updateDetectCard(null);
+    updateConfidenceIndicator(confidence, confidenceReason);
     revealManualForm();
   }
 });
@@ -1172,6 +1193,77 @@ document.getElementById('quickNextWeek').addEventListener('click', function() {
 document.getElementById('remindAt').addEventListener('input', () => {
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
+});
+
+// ── Quick Edit Chips ──────────────────────────────────────────
+
+function applyChip(newDate) {
+  if (!newDate || isNaN(newDate.getTime())) return;
+  document.getElementById('remindAt').value = toDatetimeLocalValue(newDate);
+  document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+  updateTimingPreview();
+  if (lastParsedEventDate) updateDetectCard(lastParsedEventDate, newDate);
+}
+
+document.getElementById('chip1h').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : new Date(); d.setHours(d.getHours() + 1); applyChip(d);
+});
+document.getElementById('chip2h').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : new Date(); d.setHours(d.getHours() + 2); applyChip(d);
+});
+document.getElementById('chipJutri').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : null;
+  const t = new Date(); t.setDate(t.getDate() + 1);
+  t.setHours(d ? d.getHours() : 9, d ? d.getMinutes() : 0, 0, 0);
+  applyChip(t);
+});
+document.getElementById('chipPetek').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : null;
+  const f = getNextWeekday(5, false);
+  f.setHours(d ? d.getHours() : 12, d ? d.getMinutes() : 0, 0, 0);
+  applyChip(f);
+});
+document.getElementById('chip0900').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : new Date(); d.setHours(9, 0, 0, 0); applyChip(d);
+});
+document.getElementById('chip1200').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : new Date(); d.setHours(12, 0, 0, 0); applyChip(d);
+});
+document.getElementById('chip1700').addEventListener('click', () => {
+  const val = document.getElementById('remindAt').value;
+  const d = val ? new Date(val) : new Date(); d.setHours(17, 0, 0, 0); applyChip(d);
+});
+
+// ── Quick Date Helper ─────────────────────────────────────────
+
+function applyQuickDate() {
+  const text = document.getElementById('quickDateInput').value.trim();
+  const msg  = document.getElementById('quickDateMsg');
+  if (!text) { showMessage(msg, 'Vpiši besedilo za hitri datum.', 'error'); return; }
+
+  const result = parseSmartReminderText(text, '0');
+  if (!result.eventDate || result.confidence === 'none') {
+    showMessage(msg, { code: 'ERR-014', message: 'Datuma nisem prepoznala.', action: 'Poskusi z jasnejšim formatom, npr. "jutri ob 9" ali "next Friday at 12".' }, 'error');
+    return;
+  }
+
+  document.getElementById('remindAt').value = toDatetimeLocalValue(result.eventDate);
+  document.getElementById('quickDateInput').value = '';
+  document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+  updateTimingPreview();
+  if (lastParsedEventDate) updateDetectCard(lastParsedEventDate, result.eventDate);
+  showMessage(msg, '✓ Datum nastavljen.', 'success');
+}
+
+document.getElementById('quickDateApplyBtn').addEventListener('click', applyQuickDate);
+document.getElementById('quickDateInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') applyQuickDate();
 });
 
 // ── Email Remember ────────────────────────────────────────────

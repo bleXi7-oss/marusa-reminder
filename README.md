@@ -16,6 +16,9 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 - Zaklenjena aplikacija: zaščiti z dostopno kodo pred nepooblaščenim dostopom
 - Deluje kot PWA — namestljiva na telefon ali namizje
 - Tema: 3 prednastavljene teme (Maruša, Gozd, Noč) in lastne barve, shranjeno v brskalnik
+- Browser obvestila: opomniki med odprtim tabom (brez push infrastrukture)
+- Undo brisanje: 5-sekundni toast za razveljavitev zadnjega brisanja
+- Pripenjanje opomnikov: 📌 gumb — pripeti opomniki so vedno na vrhu
 - Vsi podatki shranjeni lokalno v `data/reminders.json`
 - Brez baze podatkov, brez prijave, brez oblaka
 
@@ -86,11 +89,18 @@ Podprti formati datumov:
 
 Parsiranje je **pravilo-osnovno, brez AI**. Če datuma ni mogoče prepoznati, Maruša sporoči napako (`ERR-014`) in odpre ročni vnos.
 
+Po parsiranju se prikaže **indikator zanesljivosti**:
+- 🟢 Zelo zanesljivo — jasen datum in ura
+- 🟡 Mogoče napačen datum — ura privzeta ali datum ohlapno določen
+- 🔴 Datum ni jasen — datum ni bil zaznan
+
 ### Ročni način
 
 1. Vnesi naslov, opis, datum in email
-2. Uporabi hitre gumbe: Čez 1 uro / Jutri ob 9 / Čez 3 dni / Naslednji teden
-3. Klikni **Shrani opomnik**
+2. Uporabi hitre gumbe: Danes ob 12 / Jutri ob 9 / Petek ob 12 / Naslednji teden
+3. Uporabi **čipe za urejanje** (+1h, +2h, Jutri, Petek, 09:00, 12:00, 17:00) za hitro prilagoditev
+4. Uporabi polje **Hitri datum** za naravni vnos, npr. `jutri ob 9` ali `next Friday at 12`
+5. Klikni **Shrani opomnik**
 
 ### Zapomnitev emaila
 

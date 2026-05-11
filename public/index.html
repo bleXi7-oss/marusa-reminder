@@ -163,6 +163,8 @@
           <span id="detectBadge" class="detect-badge">✓ Uspešno</span>
         </div>
 
+        <div id="confidenceIndicator" class="confidence-indicator hidden"></div>
+
         <div id="smartMessage" class="message hidden"></div>
       </section>
 
@@ -213,7 +215,25 @@
             <button type="button" class="btn-quick" id="quickFriday12">Petek ob 12</button>
             <button type="button" class="btn-quick" id="quickNextWeek">Naslednji teden</button>
           </div>
+          <div class="edit-chips">
+            <button type="button" class="btn-chip" id="chip1h">+1h</button>
+            <button type="button" class="btn-chip" id="chip2h">+2h</button>
+            <button type="button" class="btn-chip" id="chipJutri">Jutri</button>
+            <button type="button" class="btn-chip" id="chipPetek">Petek</button>
+            <button type="button" class="btn-chip" id="chip0900">09:00</button>
+            <button type="button" class="btn-chip" id="chip1200">12:00</button>
+            <button type="button" class="btn-chip" id="chip1700">17:00</button>
+          </div>
           <div id="timingPreview" class="timing-preview hidden"></div>
+        </div>
+
+        <div class="field quick-date-field">
+          <label for="quickDateInput">Hitri datum <span class="optional">(neobvezno)</span></label>
+          <div class="quick-date-row">
+            <input type="text" id="quickDateInput" placeholder="npr. jutri ob 9, next Friday at 12" autocomplete="off" />
+            <button type="button" id="quickDateApplyBtn" class="btn-secondary quick-date-btn">Uporabi</button>
+          </div>
+          <div id="quickDateMsg" class="message hidden"></div>
         </div>
 
         <div class="field">
