@@ -241,6 +241,7 @@ function getNextWeekday(targetDay, forceNext) {
 function extractTime(text) {
   const lower = text.toLowerCase();
 
+  // AM/PM: 9am, 9:30 PM
   const ampm = text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
   if (ampm) {
     let h = parseInt(ampm[1], 10);
@@ -250,6 +251,7 @@ function extractTime(text) {
     return { hour: h, minute: min };
   }
 
+  // ob/at/@ 9, ob 9h, ob 9:30, ob 9.30
   const ob = text.match(/(?:ob|at|@)\s*(\d{1,2})(?:[.:](\d{2})|h)?\b/i);
   if (ob) {
     const h = parseInt(ob[1], 10);
@@ -257,6 +259,21 @@ function extractTime(text) {
     if (h >= 0 && h <= 23) return { hour: h, minute: min };
   }
 
+  // do/by 12h, do 12:30, do 12 h — explicit time suffix required to avoid matching dates
+  const deadlineT = text.match(/(?:do|by)\s+(\d{1,2})\s*(?:h\b|\s+h\b|[:](\d{2}))/i);
+  if (deadlineT) {
+    const h = parseInt(deadlineT[1], 10);
+    const min = deadlineT[2] ? parseInt(deadlineT[2], 10) : 0;
+    if (h >= 0 && h <= 23) return { hour: h, minute: min };
+  }
+  // bare: do 12 / by 12 — only when NOT followed by date separators (., /, -)
+  const deadlineBare = text.match(/(?:do|by)\s+(\d{1,2})\b(?![\.\d\/\-])/i);
+  if (deadlineBare) {
+    const h = parseInt(deadlineBare[1], 10);
+    if (h >= 0 && h <= 23) return { hour: h, minute: 0 };
+  }
+
+  // okoli/okrog 12
   const okoli = text.match(/(?:okoli|okrog)\s+(\d{1,2})(?:[.:](\d{2}))?\b/i);
   if (okoli) {
     const h = parseInt(okoli[1], 10);
@@ -264,29 +281,49 @@ function extractTime(text) {
     if (h >= 0 && h <= 23) return { hour: h, minute: min };
   }
 
-  if (/\beod\b|\bcob\b|konec dneva|do konca dneva/.test(lower)) return { hour: 16, minute: 0 };
-  if (/\bopoldne\b|\bnoon\b/.test(lower))                        return { hour: 12, minute: 0 };
-  if (/zgodaj zjutraj|early morning/.test(lower))                return { hour:  7, minute: 0 };
-  if (/\bzjutraj\b|\bmorning\b/.test(lower))                     return { hour:  9, minute: 0 };
-  if (/\bdopoldne\b/.test(lower))                                return { hour:  9, minute: 0 };
-  if (/\bpopoldne\b|\bafternoon\b/.test(lower))                  return { hour: 14, minute: 0 };
-  if (/\bzvečer\b|\bevening\b/.test(lower))                      return { hour: 18, minute: 0 };
+  // Named times — check more specific patterns first
+  if (/\bopolnoči\b|\bmidnight\b/.test(lower))                                             return { hour:  0, minute: 0 };
+  if (/\bopoldne\b|\bnoon\b|\bpoldne\b/.test(lower))                                      return { hour: 12, minute: 0 };
+  if (/konec dneva|do konca dneva|\beod\b|\bcob\b|end of (?:the )?day|by end of (?:the )?day/.test(lower)) return { hour: 17, minute: 0 };
+  if (/konec tedna|do konca tedna|end of (?:the )?week|by end of (?:the )?week/.test(lower))               return { hour: 17, minute: 0 };
+  if (/konec meseca|do konca meseca|end of (?:the )?month|by end of (?:the )?month/.test(lower))           return { hour: 17, minute: 0 };
+  if (/zgodaj zjutraj|early morning/.test(lower))                                          return { hour:  7, minute: 0 };
+  if (/\bzjutraj\b|\bmorning\b/.test(lower))                                               return { hour:  9, minute: 0 };
+  if (/\bdopoldne\b/.test(lower))                                                          return { hour:  9, minute: 0 };
+  if (/\bpopoldne\b|\bafternoon\b/.test(lower))                                            return { hour: 14, minute: 0 };
+  if (/\bzvečer\b|\bevening\b|\btonight\b/.test(lower))                                    return { hour: 18, minute: 0 };
 
   return null;
 }
 
 function extractRelativeMinutes(text) {
   const lower = text.toLowerCase();
-  if (/čez\s+pol\s+ure/.test(lower))         return 30;
-  const minM = lower.match(/čez\s+(\d+)\s+minut/);
-  if (minM)                                  return parseInt(minM[1]);
-  if (/čez\s+eno\s+uro/.test(lower))         return 60;
-  const hrM = lower.match(/čez\s+(\d+)\s+ur[oa]?\b/);
-  if (hrM)                                   return parseInt(hrM[1]) * 60;
-  const enHr = lower.match(/\bin\s+(\d+)\s+hour/);
-  if (enHr)                                  return parseInt(enHr[1]) * 60;
+  const SL_NUMS = { 'eno':1,'en':1,'ena':1,'dve':2,'dva':2,'tri':3,'štiri':4,'pet':5,'šest':6,'sedem':7,'osem':8,'devet':9,'deset':10 };
+  const EN_NUMS = { 'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10 };
+
+  if (/čez\s+pol\s+ure/.test(lower))            return 30;
+  if (/in\s+half\s+an?\s+hour/.test(lower))     return 30;
+
+  const slMin = lower.match(/čez\s+(\d+)\s+minut/);
+  if (slMin) return parseInt(slMin[1]);
+  const slMinW = lower.match(/čez\s+(eno|en|dve|dva|tri|štiri|pet|šest|sedem|osem|deset)\s+minut/);
+  if (slMinW) return SL_NUMS[slMinW[1]] || 1;
   const enMin = lower.match(/\bin\s+(\d+)\s+minut/);
-  if (enMin)                                 return parseInt(enMin[1]);
+  if (enMin) return parseInt(enMin[1]);
+
+  if (/čez\s+eno\s+ur[oa]|čez\s+en\s+ur[oa]/.test(lower)) return 60;
+  if (/\bin\s+one\s+hour/.test(lower))          return 60;
+
+  const slHr = lower.match(/čez\s+(\d+)\s+ur[oiea]?\b/);
+  if (slHr) return parseInt(slHr[1]) * 60;
+  const slHrW = lower.match(/čez\s+(dve|dva|tri|štiri|pet|šest|sedem|osem|devet|deset)\s+ur/);
+  if (slHrW) return (SL_NUMS[slHrW[1]] || 1) * 60;
+
+  const enHr = lower.match(/\bin\s+(\d+)\s+hour/);
+  if (enHr) return parseInt(enHr[1]) * 60;
+  const enHrW = lower.match(/\bin\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+hour/);
+  if (enHrW) return (EN_NUMS[enHrW[1]] || 1) * 60;
+
   return null;
 }
 
@@ -300,31 +337,40 @@ function extractDate(text) {
   const weekday  = d => ({ date: d, tier: 'weekday'  });
   const vague    = d => ({ date: d, tier: 'vague'    });
 
-  if (/\bdanes\b|\btoday\b/.test(lower))    return relative(new Date(today));
+  // "rok je danes", "due today", "danes" etc.
+  if (/\bdanes\b|\btoday\b|\bdue today\b|\brok je danes\b/.test(lower))    return relative(new Date(today));
 
-  if (/\bjutri\b|\btomorrow\b/.test(lower)) {
+  if (/\bjutri\b|\btomorrow\b|\bdue tomorrow\b|\brok je jutri\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d);
   }
   if (/\bpojutrišnjem\b|\bday after tomorrow\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d);
   }
 
-  if (/čez\s+en\s+dan/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
-  if (/čez\s+dva\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d); }
-  if (/čez\s+tri\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 3); return relative(d); }
+  // Slovenian relative days
+  if (/čez\s+en\s+dan|čez\s+eno?\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
+  if (/čez\s+dv[ae]\s+dn/.test(lower))  { const d = new Date(today); d.setDate(d.getDate() + 2); return relative(d); }
+  if (/čez\s+tri\s+dn/.test(lower))     { const d = new Date(today); d.setDate(d.getDate() + 3); return relative(d); }
 
   const cezDni = lower.match(/čez\s+(\d+)\s+dn/);
   if (cezDni) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezDni[1])); return relative(d); }
 
+  // Slovenian weeks
+  if (/čez\s+dv[ae]\s+ted/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
   const cezTed = lower.match(/čez\s+(\d+)\s+ted/);
   if (cezTed) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezTed[1]) * 7); return relative(d); }
-  if (/čez\s+en\s+ted|čez\s+ted/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
+  if (/čez\s+en\s+ted|čez\s+teden\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
 
+  // English relative days/weeks
+  if (/\bin\s+a\s+day\b|\bin\s+one\s+day\b/.test(lower))   { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
+  if (/\bin\s+a\s+week\b|\bin\s+one\s+week\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
+  if (/\bin\s+two\s+weeks\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
   const inDays = lower.match(/\bin\s+(\d+)\s+day/);
   if (inDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inDays[1])); return relative(d); }
   const inWeeks = lower.match(/\bin\s+(\d+)\s+week/);
   if (inWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d); }
 
+  // Explicit date formats (most specific first)
   const yyyySlash = text.match(/\b(\d{4})\/(\d{2})\/(\d{2})\b/);
   if (yyyySlash) return exact(new Date(+yyyySlash[1], +yyyySlash[2]-1, +yyyySlash[3]));
 
@@ -361,7 +407,10 @@ function extractDate(text) {
     return exact(d);
   }
 
+  // Named Slovenian months: "15. maja 2026", "15 maja", "15. maj"
   for (const [stem, mNum] of SL_MONTHS) {
+    const mWithYear = lower.match(new RegExp(`(\\d{1,2})\\.?\\s+${stem}\\w*\\s+(\\d{4})`, 'i'));
+    if (mWithYear) return exact(new Date(+mWithYear[2], mNum-1, +mWithYear[1]));
     const m = lower.match(new RegExp(`(\\d{1,2})\\.?\\s+${stem}`, 'i'));
     if (m) {
       const d = new Date(today.getFullYear(), mNum-1, +m[1]);
@@ -370,23 +419,37 @@ function extractDate(text) {
     }
   }
 
+  // Named English months: "May 15 2026", "15 May 2026", "May 15th"
   for (const [mName, mNum] of Object.entries(EN_MONTHS)) {
-    const m1 = text.match(new RegExp(`\\b${mName}\\s+(\\d{1,2})\\b`, 'i'));
-    const m2 = text.match(new RegExp(`\\b(\\d{1,2})\\s+${mName}\\b`, 'i'));
-    const day = m1 ? +m1[1] : (m2 ? +m2[1] : null);
-    if (day) {
-      const d = new Date(today.getFullYear(), mNum-1, day);
-      if (d < today) d.setFullYear(d.getFullYear() + 1);
+    const m1 = text.match(new RegExp(`\\b${mName}\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:\\s+(\\d{4}))?\\b`, 'i'));
+    const m2 = text.match(new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+${mName}(?:\\s+(\\d{4}))?\\b`, 'i'));
+    if (m1) {
+      const day = +m1[1]; const yr = m1[2] ? +m1[2] : today.getFullYear();
+      const d = new Date(yr, mNum-1, day);
+      if (!m1[2] && d < today) d.setFullYear(d.getFullYear() + 1);
+      return exact(d);
+    }
+    if (m2) {
+      const day = +m2[1]; const yr = m2[2] ? +m2[2] : today.getFullYear();
+      const d = new Date(yr, mNum-1, day);
+      if (!m2[2] && d < today) d.setFullYear(d.getFullYear() + 1);
       return exact(d);
     }
   }
 
-  if (/naslednji teden|drug teden|next week/.test(lower))
+  // "naslednji teden", "prihodnji teden", "next week" → next Monday
+  if (/naslednji teden|prihodnji teden|drug teden|next week/.test(lower))
     return vague(getNextWeekday(1, true));
-  if (/do konca tedna|konec tedna|end of (this )?week/.test(lower))
+  // end of week → Friday
+  if (/do konca tedna|konec tedna|end of (?:this |the )?week/.test(lower))
     return vague(getNextWeekday(5, false));
+  // end of month → last day of current month
+  if (/do konca meseca|konec meseca|end of (?:this |the )?month/.test(lower)) {
+    const d = new Date(today); d.setMonth(d.getMonth() + 1, 0); return vague(d);
+  }
 
-  const forceNext = /naslednji/.test(lower);
+  // Weekdays — "naslednji"/"prihodnji"/"next" force the NEXT occurrence even if today matches
+  const forceNext = /naslednji|prihodnji/.test(lower);
   for (const [re, dayNum] of SL_DAYS) {
     if (re.test(lower)) return weekday(getNextWeekday(dayNum, forceNext));
   }
@@ -394,7 +457,8 @@ function extractDate(text) {
     if (re.test(lower)) return weekday(getNextWeekday(dayNum, /\bnext\b/.test(lower)));
   }
 
-  if (/konec dneva|do konca dneva|\beod\b|\bcob\b/.test(lower))
+  // "end of day" → return today (time will be set to 17:00 by extractTime)
+  if (/konec dneva|do konca dneva|\beod\b|\bcob\b|end of (?:the )?day/.test(lower))
     return relative(new Date(today));
 
   return { date: null, tier: null };
@@ -421,6 +485,35 @@ function detectBusinessContext(text) {
   return null;
 }
 
+function stripDeadlineTail(text) {
+  return text
+    .replace(/\s*\bpričakujem\b.*$/i, '')
+    .replace(/\s*\bprosim\b.*$/i, '')
+    .replace(/\s*\bhvala\b.*$/i, '')
+    .replace(/\s*\bthank you\b.*$/i, '')
+    .replace(/\s*\b(?:do\s+(?:danes|jutri|petka|srede|torka|četrtka|sobote|nedelje|konca|naslednjega)|by\s+(?:today|tomorrow|friday|monday|tuesday|wednesday|thursday|saturday|sunday|end|the\s+end))\b.*$/i, '')
+    .replace(/\s*\bnajkasnej(?:e|š[ae])\b.*$/i, '')
+    .replace(/\s*[,.]$/, '')
+    .trim();
+}
+
+// When text has multiple explicit dates, pick the event date over the deadline date
+function extractPriorityDate(text) {
+  const found = [];
+  const re = /(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (isNaN(d.getTime())) continue;
+    const before = text.slice(Math.max(0, m.index - 80), m.index).toLowerCase();
+    const isDeadline = /\b(?:do|prijav|registr|apply|submit|pošlji|pošljite|oddaj|najkasnej|rok\b|deadline|due|register|by)\b/.test(before);
+    found.push({ date: d, isDeadline });
+  }
+  if (found.length < 2) return null;
+  const eventDate = found.find(f => !f.isDeadline);
+  return eventDate ? eventDate.date : null;
+}
+
 function extractTitle(text, businessContext) {
   const cleaned = text.replace(SIGNATURE_RE, '').trim();
 
@@ -428,14 +521,24 @@ function extractTitle(text, businessContext) {
   if (subj) return subj[1].trim().slice(0, 80);
 
   const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lep pozdrav|lp\b|dear\b)/i;
+  const FILLER_START = /^(?:vesela bom[,.]?\s*(?:če\s*se\s*vidimo\.?)?|prosim\b|hvala\b|thank you\b)\s*/i;
   const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
   for (const line of lines) {
-    const noGreeting = line.replace(GREETING_RE, '').trim();
-    if (noGreeting.length < 4) continue;
-    if (SKIP_RE.test(noGreeting)) continue;
-    const lc = noGreeting.toLowerCase();
-    if (ACTION_WORDS.some(w => lc.startsWith(w))) return noGreeting.slice(0, 80);
-    return noGreeting.slice(0, 80);
+    let t = line.replace(GREETING_RE, '').trim();
+    if (t.length < 4) continue;
+    if (SKIP_RE.test(t)) continue;
+    t = t.replace(FILLER_START, '').trim();
+    if (t.length < 4) continue;
+    // Strip leading date prefix: "27.5.2026 "
+    t = t.replace(/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\s+/, '');
+    // Strip "please " prefix
+    t = t.replace(/^please\s+/i, '');
+    // Strip deadline tail phrases
+    t = stripDeadlineTail(t);
+    if (t.length < 4) continue;
+    // Capitalize first letter
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    return t.slice(0, 80);
   }
 
   if (businessContext) return `Preveri ${businessContext}`;
@@ -455,11 +558,15 @@ function extractDescription(text) {
 
 function applyReminderOffset(date, offset) {
   const d = new Date(date);
-  if (offset === '1h') d.setHours(d.getHours() - 1);
-  if (offset === '1d') d.setDate(d.getDate() - 1);
-  if (offset === '2d') d.setDate(d.getDate() - 2);
-  if (offset === '3d') d.setDate(d.getDate() - 3);
-  if (offset === '1w') d.setDate(d.getDate() - 7);
+  if (offset === '10m') d.setMinutes(d.getMinutes() - 10);
+  if (offset === '15m') d.setMinutes(d.getMinutes() - 15);
+  if (offset === '30m') d.setMinutes(d.getMinutes() - 30);
+  if (offset === '1h')  d.setHours(d.getHours() - 1);
+  if (offset === '2h')  d.setHours(d.getHours() - 2);
+  if (offset === '1d')  d.setDate(d.getDate() - 1);
+  if (offset === '2d')  d.setDate(d.getDate() - 2);
+  if (offset === '3d')  d.setDate(d.getDate() - 3);
+  if (offset === '1w')  d.setDate(d.getDate() - 7);
   return d;
 }
 
@@ -486,10 +593,18 @@ function parseSmartReminderText(text, offset) {
     return { title, eventDate: now, remindAt: now, description, confidence: 'high', warning: null, businessContext };
   }
 
-  const { date: rawDate, tier } = extractDate(text);
+  let { date: rawDate, tier } = extractDate(text);
   const timeResult = extractTime(text);
   const multiDate  = countDateSignals(text) >= 2;
   const urgent     = detectUrgency(text);
+
+  // When multiple explicit dates exist, prefer the event date over a deadline date
+  const priorityDate = extractPriorityDate(text);
+  if (priorityDate) {
+    rawDate = priorityDate;
+    // Keep tier as 'exact' since it's an explicit date
+    tier = 'exact';
+  }
 
   if (!rawDate) {
     return {
@@ -878,6 +993,9 @@ function setQuickTime(date) {
   document.getElementById('remindAt').value = toDatetimeLocalValue(date);
 }
 
+document.getElementById('quickTodayNoon').addEventListener('click', () => {
+  const d = new Date(); d.setHours(12, 0, 0, 0); setQuickTime(d);
+});
 document.getElementById('quick1h').addEventListener('click', () => {
   const d = new Date(); d.setHours(d.getHours() + 1, d.getMinutes(), 0, 0); setQuickTime(d);
 });
@@ -888,7 +1006,8 @@ document.getElementById('quick3d').addEventListener('click', () => {
   const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
 document.getElementById('quickNextWeek').addEventListener('click', () => {
-  const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); setQuickTime(d);
+  // Always next Monday at 09:00, regardless of today's weekday
+  const d = getNextWeekday(1, true); d.setHours(9, 0, 0, 0); setQuickTime(d);
 });
 
 // ── Email Remember ────────────────────────────────────────────

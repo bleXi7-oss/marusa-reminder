@@ -120,7 +120,11 @@
           <div class="offset-row">
             <select id="smartOffset">
               <option value="0">Ob času dogodka</option>
+              <option value="10m">10 minut prej</option>
+              <option value="15m">15 minut prej</option>
+              <option value="30m">30 minut prej</option>
               <option value="1h">1 uro prej</option>
+              <option value="2h">2 uri prej</option>
               <option value="1d" selected>1 dan prej</option>
               <option value="2d">2 dni prej</option>
               <option value="3d">3 dni prej</option>
@@ -190,6 +194,7 @@
           <label for="remindAt">Datum in ura</label>
           <input type="datetime-local" id="remindAt" />
           <div class="quick-btns">
+            <button type="button" class="btn-quick" id="quickTodayNoon">Danes ob 12</button>
             <button type="button" class="btn-quick" id="quick1h">Čez 1 uro</button>
             <button type="button" class="btn-quick" id="quickTomorrow9">Jutri ob 9</button>
             <button type="button" class="btn-quick" id="quick3d">Čez 3 dni</button>
