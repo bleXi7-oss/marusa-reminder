@@ -724,6 +724,102 @@ input.theme-color-input {
   font-weight: 600;
 }
 
+/* ── Detect Card (Smart Mode parse result) ──────────────────── */
+.detect-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--green-lt);
+  border: 1px solid #b8ddc8;
+  border-radius: 10px;
+  padding: 13px 15px;
+  margin-top: 14px;
+  animation: fadeIn 0.22s ease;
+}
+
+.detect-icon {
+  font-size: 1.2rem;
+  line-height: 1.3;
+  flex-shrink: 0;
+}
+
+.detect-body { flex: 1; min-width: 0; }
+
+.detect-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  margin-bottom: 3px;
+}
+
+.detect-event {
+  font-size: 0.93rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.3;
+}
+
+.detect-reminder {
+  font-size: 0.81rem;
+  color: var(--green);
+  margin-top: 3px;
+}
+
+.detect-badge {
+  flex-shrink: 0;
+  align-self: flex-start;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--green);
+  background: rgba(74,156,106,0.13);
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+[data-theme="night"] .detect-card    { background: #1a3322; border-color: #2d5040; }
+[data-theme="night"] .detect-event   { color: #c0e8cc; }
+[data-theme="night"] .detect-reminder { color: #5ec882; }
+[data-theme="night"] .detect-label   { color: #5ec882; }
+[data-theme="night"] .detect-badge   { color: #5ec882; background: rgba(94,200,130,0.12); }
+
+/* ── Timing Preview ─────────────────────────────────────────── */
+.timing-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: var(--muted);
+  line-height: 1.4;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
+}
+
+.timing-preview.warning {
+  background: var(--amber-lt);
+  color: var(--amber);
+  border-color: rgba(201,127,46,0.4);
+}
+
+[data-theme="night"] .timing-preview.warning { background: #2a2010; border-color: #7a5020; }
+
+/* ── Quick button selected state ────────────────────────────── */
+.btn-quick.active {
+  background: var(--accent-lt);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* ── Preview mode locked-field cursor hint ──────────────────── */
+.preview-mode .field input:not([type="checkbox"]),
+.preview-mode .field textarea {
+  cursor: not-allowed;
+}
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }

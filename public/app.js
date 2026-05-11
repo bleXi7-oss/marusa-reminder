@@ -641,6 +641,71 @@ function toDatetimeLocalValue(date) {
     .toISOString().slice(0, 16);
 }
 
+// ── UX helpers ────────────────────────────────────────────────
+
+let lastParsedEventDate = null;
+
+function formatSlDate(date) {
+  return date.toLocaleString('sl-SI', {
+    weekday: 'short', day: 'numeric', month: 'short',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function updateDetectCard(eventDate, remindAt) {
+  const card = document.getElementById('detectCard');
+  if (!eventDate) { card.classList.add('hidden'); return; }
+
+  const fmtLong  = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const fmtShort = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+
+  document.getElementById('detectEventText').textContent  = eventDate.toLocaleString('sl-SI', fmtLong);
+  const reminderLine = (!remindAt || remindAt.getTime() === eventDate.getTime())
+    ? 'Opomnik: ob istem času'
+    : 'Opomnik: ' + remindAt.toLocaleString('sl-SI', fmtShort);
+  document.getElementById('detectReminderText').textContent = reminderLine;
+
+  card.classList.remove('hidden');
+}
+
+function updateTimingPreview() {
+  const el  = document.getElementById('timingPreview');
+  if (!el) return;
+  const val = document.getElementById('remindAt').value;
+  if (!val) { el.classList.add('hidden'); return; }
+
+  const d   = new Date(val);
+  const now = new Date();
+  el.classList.remove('hidden');
+
+  if (d < now) {
+    el.className  = 'timing-preview warning';
+    el.textContent = '⚠ Opomnik bi bil poslan v preteklosti.';
+  } else {
+    el.className  = 'timing-preview';
+    el.textContent = 'Opomnik bo poslan: ' + formatSlDate(d);
+  }
+}
+
+function recomputeSmartRemind() {
+  if (!lastParsedEventDate) return;
+  const useCustom = document.getElementById('customOffsetToggle').checked;
+  let remindAt;
+  if (useCustom) {
+    const amount = parseInt(document.getElementById('customOffsetAmount').value, 10) || 1;
+    const unit   = document.getElementById('customOffsetUnit').value;
+    remindAt = applyCustomReminderOffset(new Date(lastParsedEventDate), amount, unit);
+  } else {
+    remindAt = applyReminderOffset(new Date(lastParsedEventDate), document.getElementById('smartOffset').value);
+  }
+  document.getElementById('remindAt').value = toDatetimeLocalValue(remindAt);
+  const fmtOpts = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const previewReminderEl = document.getElementById('previewReminder');
+  if (previewReminderEl) previewReminderEl.textContent = remindAt.toLocaleString('sl-SI', fmtOpts);
+  updateDetectCard(lastParsedEventDate, remindAt);
+  updateTimingPreview();
+}
+
 // ── Render reminders ──────────────────────────────────────────
 
 function renderCard(r) {
@@ -784,6 +849,9 @@ async function savePendingReminder() {
     nextDay.setDate(nextDay.getDate() + 1);
     nextDay.setHours(9, 0, 0, 0);
     document.getElementById('remindAt').value = toDatetimeLocalValue(nextDay);
+    lastParsedEventDate = null;
+    updateDetectCard(null);
+    updateTimingPreview();
 
     showMessage(msg, '✓ Opomnik shranjen!', 'success');
     await loadReminders();
@@ -921,7 +989,12 @@ document.getElementById('helpBtn').addEventListener('click', function () {
 document.getElementById('customOffsetToggle').addEventListener('change', function () {
   document.getElementById('customOffsetFields').classList.toggle('hidden', !this.checked);
   document.getElementById('smartOffset').disabled = this.checked;
+  recomputeSmartRemind();
 });
+
+document.getElementById('smartOffset').addEventListener('change', recomputeSmartRemind);
+document.getElementById('customOffsetAmount').addEventListener('input', recomputeSmartRemind);
+document.getElementById('customOffsetUnit').addEventListener('change', recomputeSmartRemind);
 
 // ── Smart Paste ───────────────────────────────────────────────
 
@@ -972,6 +1045,9 @@ document.getElementById('smartBtn').addEventListener('click', () => {
 
     revealManualForm();
     enterPreviewMode(eventDate, remindAt);
+    lastParsedEventDate = new Date(eventDate);
+    updateDetectCard(eventDate, remindAt);
+    updateTimingPreview();
 
   } else {
     remindAtInput.value = '';
@@ -983,31 +1059,40 @@ document.getElementById('smartBtn').addEventListener('click', () => {
       : { code: 'ERR-014', message: 'Datuma nisem prepoznala.', action: 'Izberi datum ročno.' };
     showMessage(msg, errMsg, 'error');
 
+    lastParsedEventDate = null;
+    updateDetectCard(null);
     revealManualForm();
   }
 });
 
 // ── Quick Buttons ─────────────────────────────────────────────
 
-function setQuickTime(date) {
+function setQuickTime(date, btn) {
   document.getElementById('remindAt').value = toDatetimeLocalValue(date);
+  document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  updateTimingPreview();
 }
 
-document.getElementById('quickTodayNoon').addEventListener('click', () => {
-  const d = new Date(); d.setHours(12, 0, 0, 0); setQuickTime(d);
+document.getElementById('quickTodayNoon').addEventListener('click', function() {
+  const d = new Date(); d.setHours(12, 0, 0, 0); setQuickTime(d, this);
 });
-document.getElementById('quick1h').addEventListener('click', () => {
-  const d = new Date(); d.setHours(d.getHours() + 1, d.getMinutes(), 0, 0); setQuickTime(d);
+document.getElementById('quickTomorrow9').addEventListener('click', function() {
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); setQuickTime(d, this);
 });
-document.getElementById('quickTomorrow9').addEventListener('click', () => {
-  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); setQuickTime(d);
+document.getElementById('quickTomorrow12').addEventListener('click', function() {
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(12, 0, 0, 0); setQuickTime(d, this);
 });
-document.getElementById('quick3d').addEventListener('click', () => {
-  const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(9, 0, 0, 0); setQuickTime(d);
+document.getElementById('quickFriday12').addEventListener('click', function() {
+  const d = getNextWeekday(5, false); d.setHours(12, 0, 0, 0); setQuickTime(d, this);
 });
-document.getElementById('quickNextWeek').addEventListener('click', () => {
-  // Always next Monday at 09:00, regardless of today's weekday
-  const d = getNextWeekday(1, true); d.setHours(9, 0, 0, 0); setQuickTime(d);
+document.getElementById('quickNextWeek').addEventListener('click', function() {
+  const d = getNextWeekday(1, true); d.setHours(9, 0, 0, 0); setQuickTime(d, this);
+});
+
+document.getElementById('remindAt').addEventListener('input', () => {
+  document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+  updateTimingPreview();
 });
 
 // ── Email Remember ────────────────────────────────────────────
@@ -1155,6 +1240,8 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
 
   // Restore last mode
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
+
+  updateTimingPreview();
 
   // Auth check (lock screen / protected mode)
   const ready = await initAuth();
