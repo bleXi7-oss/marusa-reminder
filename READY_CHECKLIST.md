@@ -105,6 +105,35 @@
 - [ ] "naslednji teden" → 🟡 Mogoče napačen datum
 - [ ] Besedilo brez datuma → 🔴 Datum ni jasen
 
+## 7c. Nadaljnji opomnik (Follow-up)
+
+- [ ] Ustvari opomnik z nadaljnjim opomnik "Čez 1 uro"
+- [ ] Počakaj 1 uro — nadaljnji email mora prispeti
+- [ ] Kartica prikazuje "Nadaljnji opomnik čez 1 uro"
+- [ ] Po pošiljanju kartica prikazuje "Nadaljnji opomnik poslan ✓"
+- [ ] Uredi opomnik — polje "Nadaljnji opomnik" se obnovi
+- [ ] Izberi "Po meri" → prikažejo se polja za število in enoto
+- [ ] Nadaljnji opomnik z datumom v preteklosti → opozorilo ⚠
+- [ ] Izbriši opomnik → nadaljnji opomnik se ne pošlje
+- [ ] Ustvari opomnik brez nadaljnjega opomnika → ni pošiljanja
+
+## 7d. Smart Extracted Contacts
+
+- [ ] Prilepi besedilo z email naslovom (npr. "Pišite na info@example.com")
+- [ ] Po "Razberi opomnik" se prikaže "📧 Zaznani kontakti" chip
+- [ ] Klik na chip → kopira email v clipboard
+- [ ] Klik "Uporabi" → napolni polje "Email za opomnik"
+- [ ] Do 3 kontakti prikazani
+- [ ] Brez emaila v besedilu → ni chipov
+
+## 7e. Pametni namigi iz zgodovine
+
+- [ ] Z vsaj 3 opomniki → prikaže se razdelek "💡 Pametni namigi"
+- [ ] Prikazuje najpogostejši čas opomnikov
+- [ ] Prikazuje pogoste besede v naslovih (≥2 pojavitve)
+- [ ] Prikazuje število zamujenih ali poslanih opomnikov
+- [ ] Manj kot 3 opomniki → razdelek skrit
+
 ## 8. Ročni način
 
 - [ ] Direkten vnos naslova, opisa, datuma in emaila

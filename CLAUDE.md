@@ -44,6 +44,8 @@ Single-file Express backend (`server.js`) + vanilla JS frontend (`public/`). No 
 
 **Reminder lifecycle:** `sent: false` → server loop fires `sendReminderEmail()` → `sent: true, sentAt: ISO`
 
+**Follow-up lifecycle:** optional `followUp: { enabled, delayMinutes, sentAt }` on reminder. Server loop checks `remindAt + delayMinutes <= now && !followUp.sentAt` → sends follow-up email → `followUp.sentAt = ISO`. PATCH resets `followUp.sentAt = null` when `remindAt` moves to future.
+
 **Timezone handling:** Frontend sends UTC ISO via `new Date(localVal).toISOString()`. Server compares with `Date.now()`.
 
 ## Frontend modes

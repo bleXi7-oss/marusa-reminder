@@ -21,6 +21,9 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 - Pripenjanje opomnikov: 📌 gumb — pripeti opomniki so vedno na vrhu
 - Zgodovina: vsi pretekli in poslani opomniki ostanejo vidni, vsak je urejljiv
 - Urejanje opomnikov: gumb **Uredi** — naložijo se v obrazec, spremenjen datum jih premakne nazaj med prihajajoče
+- Nadaljnji opomnik: opcionalen follow-up email po nastavljeni zamudi (1 uro, 1 dan, po meri)
+- Zaznan kontakt: Pametni način zazna email naslove iz prilepenega besedila (do 3)
+- Pametni namigi: lokalni vpogled v zgodovino opomnikov (najpogostejši čas, pogoste besede, zamude)
 - Vsi podatki shranjeni lokalno v `data/reminders.json`
 - Brez baze podatkov, brez prijave, brez oblaka
 

@@ -321,6 +321,41 @@ async function checkAndSendReminders() {
         }));
       }
     }
+
+    if (r.followUp && r.followUp.enabled && !r.followUp.sentAt) {
+      const followUpTime = new Date(r.remindAt).getTime() + r.followUp.delayMinutes * 60000;
+      if (followUpTime <= now) {
+        console.log(`  → Pošiljam nadaljnji opomnik: "${r.title}"`);
+        try {
+          await sendEmail({
+            from:    `"Maruša Reminder" <${process.env.MAIL_FROM || process.env.GMAIL_USER}>`,
+            to:      r.email,
+            subject: `Nadaljnji opomnik: ${r.title}`,
+            text: [
+              'Hej 👋',
+              '',
+              'To je tvoj nadaljnji opomnik:',
+              '',
+              r.title,
+              '',
+              r.description ? `Opis:\n${r.description}` : null,
+              '',
+              `Prvotni čas:\n${formatDate(r.remindAt)}`,
+              '',
+              '— Maruša Reminder',
+            ].filter(l => l !== null).join('\n'),
+          });
+          r.followUp.sentAt = new Date().toISOString();
+          changed = true;
+          console.log(`  ✓ Nadaljnji opomnik poslan: "${r.title}"`);
+        } catch (err) {
+          console.error(`  ✗ Napaka pri nadaljnjem opomniku "${r.title}":`, JSON.stringify({
+            errCode: err.code,
+            errMsg:  err.message,
+          }));
+        }
+      }
+    }
   }
 
   if (changed) saveReminders(reminders);
@@ -391,7 +426,7 @@ app.get('/api/reminders', requireAuth, (req, res) => {
 });
 
 app.post('/api/reminders', requireAuth, (req, res) => {
-  const { title, description, remindAt, email } = req.body;
+  const { title, description, remindAt, email, followUp } = req.body;
 
   if (!title)    return res.status(400).json(makeError('ERR-007', { message: 'Naslov opomnika je obvezen.' }));
   if (!remindAt) return res.status(400).json(makeError('ERR-009'));
@@ -408,6 +443,10 @@ app.post('/api/reminders', requireAuth, (req, res) => {
     sentAt:      null,
     createdAt:   new Date().toISOString(),
   };
+
+  if (followUp && followUp.enabled && typeof followUp.delayMinutes === 'number' && followUp.delayMinutes > 0) {
+    reminder.followUp = { enabled: true, delayMinutes: followUp.delayMinutes, sentAt: null };
+  }
 
   try {
     const reminders = loadReminders();
@@ -433,7 +472,7 @@ app.delete('/api/reminders/:id', requireAuth, (req, res) => {
 });
 
 app.patch('/api/reminders/:id', requireAuth, (req, res) => {
-  const { title, description, remindAt, email } = req.body;
+  const { title, description, remindAt, email, followUp } = req.body;
   const reminders = loadReminders();
   const idx = reminders.findIndex(r => r.id === req.params.id);
 
@@ -453,6 +492,19 @@ app.patch('/api/reminders/:id', requireAuth, (req, res) => {
     if (new Date(remindAt).getTime() > Date.now()) {
       reminder.sent   = false;
       reminder.sentAt = null;
+      if (reminder.followUp) reminder.followUp.sentAt = null;
+    }
+  }
+
+  if (followUp !== undefined) {
+    if (!followUp || !followUp.enabled || !followUp.delayMinutes) {
+      reminder.followUp = null;
+    } else {
+      reminder.followUp = {
+        enabled:      true,
+        delayMinutes: followUp.delayMinutes,
+        sentAt:       reminder.followUp ? reminder.followUp.sentAt : null,
+      };
     }
   }
 

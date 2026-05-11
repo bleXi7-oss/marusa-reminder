@@ -706,6 +706,45 @@ function updateTimingPreview() {
   }
 }
 
+function formatFollowUpDelay(minutes) {
+  const m = { 60: 'čez 1 uro', 120: 'čez 2 uri', 1440: 'čez 1 dan', 2880: 'čez 2 dni' };
+  return m[minutes] || (minutes < 60 ? minutes + ' min' : minutes < 1440 ? (minutes/60) + ' h' : (minutes/1440) + ' dni');
+}
+
+function getFollowUpMinutes() {
+  const sel = document.getElementById('followUpSelect');
+  if (!sel) return 0;
+  const v = sel.value;
+  if (v === '0') return 0;
+  if (v === 'custom') {
+    const n    = parseInt(document.getElementById('followUpAmount').value, 10) || 1;
+    const unit = document.getElementById('followUpUnit').value;
+    if (unit === 'minut')  return n;
+    if (unit === 'ur')     return n * 60;
+    if (unit === 'dni')    return n * 1440;
+    if (unit === 'tednov') return n * 10080;
+  }
+  return parseInt(v, 10);
+}
+
+function updateFollowUpPreview() {
+  const el = document.getElementById('followUpPreview');
+  if (!el) return;
+  const minutes = getFollowUpMinutes();
+  if (minutes === 0) { el.classList.add('hidden'); return; }
+  const val = document.getElementById('remindAt').value;
+  if (!val) { el.classList.add('hidden'); return; }
+  const followUpTime = new Date(new Date(val).getTime() + minutes * 60000);
+  el.classList.remove('hidden');
+  if (followUpTime < new Date()) {
+    el.className   = 'timing-preview warning';
+    el.textContent = '⚠ Nadaljnji opomnik bi bil v preteklosti.';
+  } else {
+    el.className   = 'timing-preview';
+    el.textContent = 'Nadaljnji opomnik: ' + formatSlDate(followUpTime);
+  }
+}
+
 function recomputeSmartRemind() {
   if (!lastParsedEventDate) return;
   const useCustom = document.getElementById('customOffsetToggle').checked;
@@ -762,6 +801,7 @@ function renderCard(r) {
     </div>
     ${r.description ? `<div class="card-desc">${escHtml(r.description)}</div>` : ''}
     <div class="card-time">🕐 ${formatDate(r.remindAt)}</div>
+    ${r.followUp && r.followUp.enabled ? `<div class="card-followup${r.followUp.sentAt ? ' sent' : ''}">↩ ${r.followUp.sentAt ? 'Nadaljnji opomnik poslan ✓' : 'Nadaljnji opomnik ' + formatFollowUpDelay(r.followUp.delayMinutes)}</div>` : ''}
     <div class="card-actions">
       ${!r.sent ? `<button class="btn-pin${pinned ? ' pinned' : ''}" onclick="togglePin('${r.id}')" title="${pinned ? 'Odpni' : 'Pripni'}">📌</button>` : ''}
       ${status !== 'sent' ? `<button class="btn-small" onclick="sendNow('${r.id}', this)">Pošlji zdaj</button>` : ''}
@@ -775,6 +815,7 @@ function renderCard(r) {
 function renderAll(reminders) {
   allReminders = reminders;
   checkAndNotify(reminders);
+  renderInsights(reminders);
 
   const now      = new Date();
   const upcoming = reminders.filter(r => !r.sent && new Date(r.remindAt) > now);
@@ -929,8 +970,36 @@ async function editReminder(id) {
   lastParsedEventDate = null;
   updateDetectCard(null);
   updateConfidenceIndicator(null);
+  // Restore follow-up setting
+  const followUpSel = document.getElementById('followUpSelect');
+  if (reminder.followUp && reminder.followUp.enabled) {
+    const presets = [60, 120, 1440, 2880];
+    if (presets.includes(reminder.followUp.delayMinutes)) {
+      followUpSel.value = String(reminder.followUp.delayMinutes);
+      document.getElementById('followUpCustomFields').classList.add('hidden');
+    } else {
+      followUpSel.value = 'custom';
+      document.getElementById('followUpCustomFields').classList.remove('hidden');
+      const mins = reminder.followUp.delayMinutes;
+      if (mins < 60) {
+        document.getElementById('followUpAmount').value = mins;
+        document.getElementById('followUpUnit').value   = 'minut';
+      } else if (mins < 1440) {
+        document.getElementById('followUpAmount').value = Math.round(mins / 60);
+        document.getElementById('followUpUnit').value   = 'ur';
+      } else {
+        document.getElementById('followUpAmount').value = Math.round(mins / 1440);
+        document.getElementById('followUpUnit').value   = 'dni';
+      }
+    }
+  } else {
+    followUpSel.value = '0';
+    document.getElementById('followUpCustomFields').classList.add('hidden');
+  }
+
   enterEditMode(reminder);
   updateTimingPreview();
+  updateFollowUpPreview();
   document.getElementById('manualSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -967,10 +1036,12 @@ async function savePendingReminder() {
   try {
     const url    = isEditing ? `/api/reminders/${editingReminderId}` : '/api/reminders';
     const method = isEditing ? 'PATCH' : 'POST';
+    const followUpMinutes  = getFollowUpMinutes();
+    const followUpPayload  = followUpMinutes > 0 ? { enabled: true, delayMinutes: followUpMinutes } : null;
     const res  = await apiFetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ title, description: desc, remindAt, email }),
+      body:    JSON.stringify({ title, description: desc, remindAt, email, followUp: followUpPayload }),
     });
     const data = await res.json();
     if (res.status === 401) { handleUnauthorized(); return; }
@@ -992,7 +1063,10 @@ async function savePendingReminder() {
     updateDetectCard(null);
     updateConfidenceIndicator(null);
     document.getElementById('quickDateInput').value = '';
+    document.getElementById('followUpSelect').value = '0';
+    document.getElementById('followUpCustomFields').classList.add('hidden');
     updateTimingPreview();
+    updateFollowUpPreview();
 
     showMessage(msg, isEditing ? '✓ Opomnik posodobljen!' : '✓ Opomnik shranjen!', 'success');
     await loadReminders();
@@ -1186,6 +1260,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
       showMessage(msg, 'Opomnik pripravljen 👌', 'success');
     }
 
+    showExtractedContacts(extractContacts(text));
     revealManualForm();
     if (!isPast) enterPreviewMode(eventDate, remindAt);
     lastParsedEventDate = new Date(eventDate);
@@ -1206,6 +1281,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     lastParsedEventDate = null;
     updateDetectCard(null);
     updateConfidenceIndicator(confidence, confidenceReason);
+    showExtractedContacts(extractContacts(text));
     revealManualForm();
   }
 });
@@ -1217,6 +1293,7 @@ function setQuickTime(date, btn) {
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   updateTimingPreview();
+  updateFollowUpPreview();
 }
 
 document.getElementById('quickTodayNoon').addEventListener('click', function() {
@@ -1238,6 +1315,7 @@ document.getElementById('quickNextWeek').addEventListener('click', function() {
 document.getElementById('remindAt').addEventListener('input', () => {
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
+  updateFollowUpPreview();
 });
 
 // ── Quick Edit Chips ──────────────────────────────────────────
@@ -1247,6 +1325,7 @@ function applyChip(newDate) {
   document.getElementById('remindAt').value = toDatetimeLocalValue(newDate);
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
+  updateFollowUpPreview();
   if (lastParsedEventDate) updateDetectCard(lastParsedEventDate, newDate);
 }
 
@@ -1310,6 +1389,98 @@ document.getElementById('quickDateApplyBtn').addEventListener('click', applyQuic
 document.getElementById('quickDateInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') applyQuickDate();
 });
+
+// ── Follow-up Reminder ────────────────────────────────────────
+
+document.getElementById('followUpSelect').addEventListener('change', function () {
+  document.getElementById('followUpCustomFields').classList.toggle('hidden', this.value !== 'custom');
+  updateFollowUpPreview();
+});
+document.getElementById('followUpAmount').addEventListener('input', updateFollowUpPreview);
+document.getElementById('followUpUnit').addEventListener('change', updateFollowUpPreview);
+
+// ── Smart Extracted Contacts ──────────────────────────────────
+
+function extractContacts(text) {
+  const re = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const found = []; const seen = new Set(); let m;
+  while ((m = re.exec(text)) !== null && found.length < 3) {
+    const e = m[0].toLowerCase();
+    if (!seen.has(e)) { seen.add(e); found.push(e); }
+  }
+  return found;
+}
+
+function useContactEmail(email) {
+  document.getElementById('email').value = email;
+  if (document.getElementById('rememberEmail').checked) localStorage.setItem(EMAIL_KEY, email);
+  updateEmailStatus();
+}
+
+function showExtractedContacts(contacts) {
+  const section = document.getElementById('contactsSection');
+  const chips   = document.getElementById('contactChips');
+  if (!contacts || contacts.length === 0) {
+    section.classList.add('hidden');
+    chips.innerHTML = '';
+    return;
+  }
+  chips.innerHTML = '';
+  contacts.forEach(email => {
+    const chip = document.createElement('div');
+    chip.className = 'contact-chip';
+    chip.title     = 'Klikni za kopiranje';
+    chip.innerHTML = `<span class="contact-chip-email">${escHtml(email)}</span><button type="button" class="contact-chip-use" onclick="useContactEmail(${JSON.stringify(email)})">Uporabi</button>`;
+    chip.addEventListener('click', (e) => {
+      if (e.target.classList.contains('contact-chip-use')) return;
+      navigator.clipboard.writeText(email).catch(() => {});
+    });
+    chips.appendChild(chip);
+  });
+  section.classList.remove('hidden');
+}
+
+// ── History Intelligence ──────────────────────────────────────
+
+function buildHistoryInsights(reminders) {
+  if (reminders.length < 3) return [];
+  const insights = [];
+
+  const hourCounts = {};
+  reminders.forEach(r => { const h = new Date(r.remindAt).getHours(); hourCounts[h] = (hourCounts[h] || 0) + 1; });
+  const topHour = Object.entries(hourCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topHour && topHour[1] >= 2) insights.push(`Najpogostejši čas opomnika: ${String(topHour[0]).padStart(2, '0')}:00.`);
+
+  const fuCount = reminders.filter(r => r.followUp && r.followUp.enabled).length;
+  if (fuCount > 0) insights.push(`Ustvarjaš nadaljnje opomnike (${fuCount}x).`);
+
+  const STOP = new Set(['in','na','za','ob','do','od','po','je','se','so','to','ko','da','bi','ga','jo','mi','ti','mu','ji','ter','ali','ker','med','pri']);
+  const wordCounts = {};
+  reminders.forEach(r => {
+    r.title.toLowerCase().split(/[\s,.:;!?]+/).forEach(w => {
+      if (w.length >= 4 && !STOP.has(w)) wordCounts[w] = (wordCounts[w] || 0) + 1;
+    });
+  });
+  const topWords = Object.entries(wordCounts).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(e => e[1] >= 2);
+  if (topWords.length > 0) insights.push(`Pogoste besede: ${topWords.map(e => e[0]).join(', ')}.`);
+
+  const overdue = reminders.filter(r => !r.sent && new Date(r.remindAt) < new Date()).length;
+  const sent    = reminders.filter(r => r.sent).length;
+  if (overdue > 0) insights.push(`${overdue} zamujeni${overdue === 1 ? '' : 'h'} opomnik${overdue === 1 ? '' : 'ov'}.`);
+  else if (sent >= 3) insights.push(`${sent} opomnikov uspešno poslanih.`);
+
+  return insights;
+}
+
+function renderInsights(reminders) {
+  const section = document.getElementById('insightsSection');
+  const list    = document.getElementById('insightsList');
+  if (!section || !list) return;
+  const insights = buildHistoryInsights(reminders);
+  if (insights.length === 0) { section.classList.add('hidden'); return; }
+  list.innerHTML = insights.map(t => `<div class="insight-item">${escHtml(t)}</div>`).join('');
+  section.classList.remove('hidden');
+}
 
 // ── Email Remember ────────────────────────────────────────────
 
@@ -1528,6 +1699,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
   setMode(localStorage.getItem(MODE_KEY) || 'smart');
 
   updateTimingPreview();
+  updateFollowUpPreview();
 
   updateNotifUI();
 

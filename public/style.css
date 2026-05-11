@@ -1008,6 +1008,94 @@ input.theme-color-input {
 
 [data-theme="night"] .edit-mode-banner { background: #2a1e30; border-color: #7060a4; }
 
+/* ── Follow-up amount input ─────────────────────────────────── */
+#followUpAmount {
+  width: 76px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* ── Extracted contacts (Smart Mode) ───────────────────────── */
+.contacts-section {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.contacts-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.contact-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.contact-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 11px;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.contact-chip:hover { background: var(--accent-lt); }
+
+.contact-chip-email { font-family: monospace; font-size: 0.78rem; }
+
+.contact-chip-use {
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+}
+
+/* ── Card follow-up line ────────────────────────────────────── */
+.card-followup { margin-top: 4px; font-size: 0.78rem; color: var(--muted); }
+.card-followup.sent { color: var(--green); }
+
+/* ── History insights card ──────────────────────────────────── */
+.insights-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-top: 10px;
+  box-shadow: var(--shadow);
+}
+
+.insights-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.insight-item {
+  font-size: 0.82rem;
+  color: var(--muted);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+  line-height: 1.4;
+}
+
+.insight-item:last-child { border-bottom: none; }
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }
