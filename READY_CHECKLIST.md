@@ -116,6 +116,9 @@
 - [ ] Nadaljnji opomnik z datumom v preteklosti → opozorilo ⚠
 - [ ] Izbriši opomnik → nadaljnji opomnik se ne pošlje
 - [ ] Ustvari opomnik brez nadaljnjega opomnika → ni pošiljanja
+- [ ] Pametni način → nastavi datum → nastavi nadaljnji opomnik → predogled prikaže "↩ Nadaljnji opomnik: čez 1 uro\nPoslan bo: …"
+- [ ] Browser obvestilo: ob nadaljnjem času se prikaže "🔔 Maruša Follow-up — Ponovno preveri: [naslov]"
+- [ ] Brez podvojenega obvestila (nadaljnji opomnik → samo eno obvestilo)
 
 ## 7d. Smart Extracted Contacts
 

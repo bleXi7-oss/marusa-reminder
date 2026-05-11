@@ -795,6 +795,7 @@ input.theme-color-input {
   font-size: 0.82rem;
   color: var(--muted);
   line-height: 1.4;
+  white-space: pre-line;
   transition: background 0.18s, color 0.18s, border-color 0.18s;
 }
 

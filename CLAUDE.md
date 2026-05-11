@@ -46,6 +46,8 @@ Single-file Express backend (`server.js`) + vanilla JS frontend (`public/`). No 
 
 **Follow-up lifecycle:** optional `followUp: { enabled, delayMinutes, sentAt }` on reminder. Server loop checks `remindAt + delayMinutes <= now && !followUp.sentAt` → sends follow-up email → `followUp.sentAt = ISO`. PATCH resets `followUp.sentAt = null` when `remindAt` moves to future.
 
+**Follow-up browser notification:** `checkAndNotifyFollowUps(reminders)` fires a `Notification('🔔 Maruša Follow-up', ...)` when `remindAt + delayMinutes` arrives while the tab is open (same `appStartTime - 30s` guard as main notifications). Dedup key: `localStorage('marusa_notified_followup')` (separate from main `marusa_notified`).
+
 **Timezone handling:** Frontend sends UTC ISO via `new Date(localVal).toISOString()`. Server compares with `Date.now()`.
 
 ## Frontend modes

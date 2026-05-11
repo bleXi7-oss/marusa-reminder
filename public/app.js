@@ -741,7 +741,7 @@ function updateFollowUpPreview() {
     el.textContent = '⚠ Nadaljnji opomnik bi bil v preteklosti.';
   } else {
     el.className   = 'timing-preview';
-    el.textContent = 'Nadaljnji opomnik: ' + formatSlDate(followUpTime);
+    el.textContent = '↩ Nadaljnji opomnik: ' + formatFollowUpDelay(minutes) + '\nPoslan bo: ' + formatSlDate(followUpTime);
   }
 }
 
@@ -815,6 +815,7 @@ function renderCard(r) {
 function renderAll(reminders) {
   allReminders = reminders;
   checkAndNotify(reminders);
+  checkAndNotifyFollowUps(reminders);
   renderInsights(reminders);
 
   const now      = new Date();
@@ -1267,6 +1268,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     updateDetectCard(eventDate, remindAt);
     updateConfidenceIndicator(confidence, confidenceReason);
     updateTimingPreview();
+    updateFollowUpPreview();
 
   } else {
     remindAtInput.value = '';
@@ -1381,6 +1383,7 @@ function applyQuickDate() {
   document.getElementById('quickDateInput').value = '';
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
+  updateFollowUpPreview();
   if (lastParsedEventDate) updateDetectCard(lastParsedEventDate, result.eventDate);
   showMessage(msg, '✓ Datum nastavljen.', 'success');
 }
@@ -1634,6 +1637,41 @@ function checkAndNotify(reminders) {
         n.onclick = () => { window.focus(); };
       } catch(e) {}
       markNotified(r.id);
+    }
+  });
+}
+
+const NOTIF_FOLLOWUP_KEY = 'marusa_notified_followup';
+
+function getNotifiedFollowUpIds() {
+  try { return new Set(JSON.parse(localStorage.getItem(NOTIF_FOLLOWUP_KEY) || '[]')); }
+  catch { return new Set(); }
+}
+
+function markFollowUpNotified(id) {
+  const ids = getNotifiedFollowUpIds();
+  ids.add(id);
+  localStorage.setItem(NOTIF_FOLLOWUP_KEY, JSON.stringify([...ids]));
+}
+
+function checkAndNotifyFollowUps(reminders) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const notified = getNotifiedFollowUpIds();
+  const now = Date.now();
+  reminders.forEach(r => {
+    if (!r.followUp || !r.followUp.enabled) return;
+    if (notified.has(r.id)) return;
+    const followUpTime = new Date(r.remindAt).getTime() + r.followUp.delayMinutes * 60000;
+    if (followUpTime <= now && followUpTime >= appStartTime - 30000) {
+      try {
+        const n = new Notification('🔔 Maruša Follow-up', {
+          body: 'Ponovno preveri: ' + r.title,
+          icon: '/icons/apple-touch-icon.png',
+          tag:  'marusa-followup-' + r.id,
+        });
+        n.onclick = () => { window.focus(); };
+      } catch(e) {}
+      markFollowUpNotified(r.id);
     }
   });
 }
