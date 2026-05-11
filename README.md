@@ -19,6 +19,8 @@ Ustvariš opomnik → ob pravem času dobiš email na Gmail.
 - Browser obvestila: opomniki med odprtim tabom (brez push infrastrukture)
 - Undo brisanje: 5-sekundni toast za razveljavitev zadnjega brisanja
 - Pripenjanje opomnikov: 📌 gumb — pripeti opomniki so vedno na vrhu
+- Zgodovina: vsi pretekli in poslani opomniki ostanejo vidni, vsak je urejljiv
+- Urejanje opomnikov: gumb **Uredi** — naložijo se v obrazec, spremenjen datum jih premakne nazaj med prihajajoče
 - Vsi podatki shranjeni lokalno v `data/reminders.json`
 - Brez baze podatkov, brez prijave, brez oblaka
 
@@ -101,6 +103,13 @@ Po parsiranju se prikaže **indikator zanesljivosti**:
 3. Uporabi **čipe za urejanje** (+1h, +2h, Jutri, Petek, 09:00, 12:00, 17:00) za hitro prilagoditev
 4. Uporabi polje **Hitri datum** za naravni vnos, npr. `jutri ob 9` ali `next Friday at 12`
 5. Klikni **Shrani opomnik**
+
+### Urejanje preteklih opomnikov
+
+1. V razdelku **Zgodovina** poišči opomnik
+2. Klikni **Uredi** — obrazec se napolni s podatki
+3. Spremeni datum (npr. na prihodnji teden)
+4. Klikni **Posodobi opomnik** — opomnik se premakne med prihajajoče
 
 ### Zapomnitev emaila
 

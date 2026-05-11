@@ -72,7 +72,28 @@
 - [ ] App se zbudi v 30–60 sekundah (med zbujanjem morda `ERR-012`)
 - [ ] Po zbujanju vse deluje normalno
 
-## 7. Pametni način
+## 7. Zgodovina in urejanje opomnikov
+
+- [ ] Pretekli opomniki (poslani + zamujeni) se pokažejo v razdelku **Zgodovina**
+- [ ] Razdelek **Prihajajoči opomniki** prikazuje samo prihodnje (ne-poslane) opomnike
+- [ ] Pretekli opomniki so razvrščeni od najnovejšega naprej
+- [ ] Gumb **Uredi** je viden pri vsakem opomniki (prihajajoči in zgodovinski)
+- [ ] Klik **Uredi** napolni obrazec z obstoječimi podatki
+- [ ] Brskalnik se premakne na obrazec in prikaže banner "Urejate: [naslov]"
+- [ ] Gumb **Prekliči** v bannerju zapusti način urejanja brez shranjevanja
+- [ ] Sprememba datuma na prihodnjost → klik **Posodobi opomnik** premakne v prihajajoče
+- [ ] Sprememba datuma na preteklost → opomnik ostane v zgodovini z "Zamuja" oznako
+- [ ] Brisanje med urejanjem zapusti način urejanja
+
+## 7b. Pametni način — napaka preteklega časa
+
+- [ ] Vnos "danes ob 13h" ob 12:41 z odmikom "1 uro prej" → zaznan čas 13:00, opomnik 12:00
+- [ ] Prikaže se opozorilo: "Opomnik bi bil poslan v preteklosti. Izberi manjši zamik ali kasnejši čas."
+- [ ] Obrazec NI zaklenjen — čipi in polje za hitri datum so aktivni za popravek
+- [ ] Vnos "today at 1pm" → zaznan čas 13:00
+- [ ] Vnos "danes do 13h" → zaznan čas 13:00
+
+## 8. Pametni način
 
 - [ ] Prilepi besedilo z datumom → Maruša prepozna datum
 - [ ] Predogled prikazuje Opravilo / Dogodek / Opomnik

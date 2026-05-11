@@ -432,6 +432,39 @@ app.delete('/api/reminders/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.patch('/api/reminders/:id', requireAuth, (req, res) => {
+  const { title, description, remindAt, email } = req.body;
+  const reminders = loadReminders();
+  const idx = reminders.findIndex(r => r.id === req.params.id);
+
+  if (idx === -1) return res.status(404).json(makeError('ERR-006'));
+
+  const reminder = reminders[idx];
+
+  if (title !== undefined)       reminder.title       = title;
+  if (description !== undefined) reminder.description = description;
+  if (email !== undefined) {
+    if (!EMAIL_RE.test(email)) return res.status(400).json(makeError('ERR-008', { message: 'Email ni veljaven.' }));
+    reminder.email = email;
+  }
+  if (remindAt !== undefined) {
+    if (isNaN(new Date(remindAt).getTime())) return res.status(400).json(makeError('ERR-009'));
+    reminder.remindAt = remindAt;
+    if (new Date(remindAt).getTime() > Date.now()) {
+      reminder.sent   = false;
+      reminder.sentAt = null;
+    }
+  }
+
+  try {
+    saveReminders(reminders);
+    res.json(reminder);
+  } catch (err) {
+    console.error('Napaka shranjevanja:', err.message);
+    res.status(500).json(makeError('ERR-007'));
+  }
+});
+
 app.post('/api/reminders/:id/send-now', requireAuth, async (req, res) => {
   const reminders = loadReminders();
   const reminder  = reminders.find(r => r.id === req.params.id);

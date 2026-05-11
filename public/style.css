@@ -982,6 +982,32 @@ input.theme-color-input {
 
 .preview-mode .quick-date-field { display: none; }
 
+/* ── Edit mode banner ───────────────────────────────────────── */
+.edit-mode-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--accent-lt);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 9px 13px;
+  margin-bottom: 14px;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+#editModeTitle {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+[data-theme="night"] .edit-mode-banner { background: #2a1e30; border-color: #7060a4; }
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 400px) {
   header h1 { font-size: 1.55rem; }

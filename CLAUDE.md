@@ -97,7 +97,7 @@ Key functions:
 - `detectBusinessContext(text)` → label string (račun, plačilo, ponudba...) or null
 - `extractTitle(text, businessContext)` → clean title, max 80 chars
 - `extractDescription(text)` → clean summary, max 140 chars
-- `parseSmartReminderText(text, offset)` → `{ title, eventDate, remindAt, description, confidence, warning, businessContext }`
+- `parseSmartReminderText(text, offset)` → `{ title, eventDate, remindAt, description, confidence, confidenceReason, warning, businessContext }`
 
 **Confidence tiers:**
 - `high` = exact date + specific time → green, prefill form
@@ -119,6 +119,7 @@ All routes except `/api/health` and `/api/auth` require `X-App-Code` header when
 | GET | `/api/auth` | Yes | Verify access code (used by frontend unlock) |
 | GET | `/api/reminders` | Yes | List all |
 | POST | `/api/reminders` | Yes | Create (`{title, description?, remindAt, email}`) |
+| PATCH | `/api/reminders/:id` | Yes | Update fields; if new `remindAt` > now, resets `sent=false` |
 | DELETE | `/api/reminders/:id` | Yes | Delete |
 | POST | `/api/reminders/:id/send-now` | Yes | Force-send |
 | POST | `/api/test-email` | Yes | Test email (`{email?}`) |

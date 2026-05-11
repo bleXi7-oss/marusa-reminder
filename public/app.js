@@ -650,6 +650,7 @@ function toDatetimeLocalValue(date) {
 // ── UX helpers ────────────────────────────────────────────────
 
 let lastParsedEventDate = null;
+let editingReminderId = null;
 let allReminders = [];
 
 function formatSlDate(date) {
@@ -764,6 +765,7 @@ function renderCard(r) {
     <div class="card-actions">
       ${!r.sent ? `<button class="btn-pin${pinned ? ' pinned' : ''}" onclick="togglePin('${r.id}')" title="${pinned ? 'Odpni' : 'Pripni'}">📌</button>` : ''}
       ${status !== 'sent' ? `<button class="btn-small" onclick="sendNow('${r.id}', this)">Pošlji zdaj</button>` : ''}
+      <button class="btn-small" onclick="editReminder('${r.id}')">Uredi</button>
       <button class="btn-small danger" onclick="deleteReminder('${r.id}', this)">Izbriši</button>
     </div>
   `;
@@ -774,16 +776,17 @@ function renderAll(reminders) {
   allReminders = reminders;
   checkAndNotify(reminders);
 
-  const upcoming = reminders.filter(r => !r.sent);
-  const sent     = reminders.filter(r => r.sent);
+  const now      = new Date();
+  const upcoming = reminders.filter(r => !r.sent && new Date(r.remindAt) > now);
+  const history  = reminders.filter(r => r.sent || new Date(r.remindAt) <= now);
   const upcomingList = document.getElementById('upcomingList');
-  const sentList     = document.getElementById('sentList');
+  const historyList  = document.getElementById('sentList');
 
   upcomingList.innerHTML = '';
-  sentList.innerHTML = '';
+  historyList.innerHTML  = '';
 
   if (upcoming.length === 0) {
-    upcomingList.innerHTML = '<div class="empty">Ni še nobenih opomnikov 😄</div>';
+    upcomingList.innerHTML = '<div class="empty">Ni prihodnjih opomnikov 😄</div>';
   } else {
     upcoming.sort((a, b) => {
       const pa = isPinned(a.id) ? 0 : 1;
@@ -794,11 +797,11 @@ function renderAll(reminders) {
     upcoming.forEach(r => upcomingList.appendChild(renderCard(r)));
   }
 
-  if (sent.length === 0) {
-    sentList.innerHTML = '<div class="empty">Še ni poslanih opomnikov.</div>';
+  if (history.length === 0) {
+    historyList.innerHTML = '<div class="empty">Ni preteklih opomnikov.</div>';
   } else {
-    sent.sort((a, b) => new Date(b.sentAt) - new Date(a.sentAt));
-    sent.forEach(r => sentList.appendChild(renderCard(r)));
+    history.sort((a, b) => new Date(b.remindAt) - new Date(a.remindAt));
+    history.forEach(r => historyList.appendChild(renderCard(r)));
   }
 }
 
@@ -841,6 +844,7 @@ async function sendNow(id, btn) {
 
 async function deleteReminder(id, btn) {
   btn.disabled = true;
+  if (id === editingReminderId) exitEditMode();
   const reminderData = allReminders.find(r => r.id === id);
   const undoData = reminderData ? { ...reminderData, pinned: isPinned(id) } : null;
   try {
@@ -897,6 +901,41 @@ document.getElementById('undoBtn').addEventListener('click', async () => {
   } catch {}
 });
 
+// ── Edit Reminder ─────────────────────────────────────────────
+
+function enterEditMode(reminder) {
+  editingReminderId = reminder.id;
+  document.getElementById('editModeTitle').textContent = 'Urejate: ' + reminder.title;
+  document.getElementById('editModeBanner').classList.remove('hidden');
+  document.getElementById('saveBtn').textContent = 'Posodobi opomnik';
+}
+
+function exitEditMode() {
+  if (!editingReminderId) return;
+  editingReminderId = null;
+  document.getElementById('editModeBanner').classList.add('hidden');
+  document.getElementById('saveBtn').textContent = 'Shrani opomnik';
+}
+
+async function editReminder(id) {
+  const reminder = allReminders.find(r => r.id === id);
+  if (!reminder) return;
+  setMode('manual');
+  exitPreviewMode();
+  document.getElementById('title').value       = reminder.title;
+  document.getElementById('description').value = reminder.description || '';
+  document.getElementById('remindAt').value    = toDatetimeLocalValue(new Date(reminder.remindAt));
+  document.getElementById('email').value       = reminder.email;
+  lastParsedEventDate = null;
+  updateDetectCard(null);
+  updateConfidenceIndicator(null);
+  enterEditMode(reminder);
+  updateTimingPreview();
+  document.getElementById('manualSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.getElementById('cancelEditBtn').addEventListener('click', exitEditMode);
+
 // ── Form save ─────────────────────────────────────────────────
 
 async function savePendingReminder() {
@@ -918,6 +957,7 @@ async function savePendingReminder() {
     return;
   }
 
+  const isEditing = !!editingReminderId;
   exitPreviewMode();
 
   const saveBtn = document.getElementById('saveBtn');
@@ -925,8 +965,10 @@ async function savePendingReminder() {
   saveBtn.textContent = 'Shranjujem…';
 
   try {
-    const res  = await apiFetch('/api/reminders', {
-      method:  'POST',
+    const url    = isEditing ? `/api/reminders/${editingReminderId}` : '/api/reminders';
+    const method = isEditing ? 'PATCH' : 'POST';
+    const res  = await apiFetch(url, {
+      method,
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ title, description: desc, remindAt, email }),
     });
@@ -937,6 +979,7 @@ async function savePendingReminder() {
       return;
     }
 
+    exitEditMode();
     document.getElementById('title').value = '';
     document.getElementById('description').value = '';
     document.getElementById('smartText').value = '';
@@ -951,7 +994,7 @@ async function savePendingReminder() {
     document.getElementById('quickDateInput').value = '';
     updateTimingPreview();
 
-    showMessage(msg, '✓ Opomnik shranjen!', 'success');
+    showMessage(msg, isEditing ? '✓ Opomnik posodobljen!' : '✓ Opomnik shranjen!', 'success');
     await loadReminders();
   } catch {
     showMessage(msg, 'Shranjevanje ni uspelo.', 'error');
@@ -1047,6 +1090,7 @@ function setMode(mode) {
     smartSection.classList.remove('hidden');
     manualSection.classList.add('hidden');
     exitPreviewMode();
+    exitEditMode();
   } else {
     smartSection.classList.add('hidden');
     manualSection.classList.remove('hidden');
@@ -1133,8 +1177,9 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     remindAtInput.value = toDatetimeLocalValue(remindAt);
     remindAtInput.style.borderColor = '';
 
-    if (remindAt < new Date()) {
-      showMessage(msg, 'Izračunan opomnik je v preteklosti. Preveri datum ali offset.', 'error');
+    const isPast = remindAt < new Date();
+    if (isPast) {
+      showMessage(msg, 'Opomnik bi bil poslan v preteklosti. Izberi manjši zamik ali kasnejši čas.', 'error');
     } else if (warning) {
       showMessage(msg, warning, 'error');
     } else {
@@ -1142,7 +1187,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     }
 
     revealManualForm();
-    enterPreviewMode(eventDate, remindAt);
+    if (!isPast) enterPreviewMode(eventDate, remindAt);
     lastParsedEventDate = new Date(eventDate);
     updateDetectCard(eventDate, remindAt);
     updateConfidenceIndicator(confidence, confidenceReason);
