@@ -337,8 +337,8 @@ function extractDate(text) {
   const weekday  = d => ({ date: d, tier: 'weekday'  });
   const vague    = d => ({ date: d, tier: 'vague'    });
 
-  // "rok je danes", "due today", "danes" etc.
-  if (/\bdanes\b|\btoday\b|\bdue today\b|\brok je danes\b/.test(lower))    return relative(new Date(today));
+  // "rok je danes", "due today", "danes", "tonight" etc.
+  if (/\bdanes\b|\btoday\b|\bdue today\b|\brok je danes\b|\btonight\b/.test(lower))    return relative(new Date(today));
 
   if (/\bjutri\b|\btomorrow\b|\bdue tomorrow\b|\brok je jutri\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d);
@@ -356,17 +356,24 @@ function extractDate(text) {
   if (cezDni) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezDni[1])); return relative(d); }
 
   // Slovenian weeks
-  if (/čez\s+dv[ae]\s+ted/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/čez\s+en\s+ted|čez\s+teden\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7);  return relative(d); }
+  if (/čez\s+dv[ae]\s+ted/.test(lower))            { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/čez\s+tri\s+ted/.test(lower))               { const d = new Date(today); d.setDate(d.getDate() + 21); return relative(d); }
+  if (/čez\s+štiri\s+ted/.test(lower))             { const d = new Date(today); d.setDate(d.getDate() + 28); return relative(d); }
   const cezTed = lower.match(/čez\s+(\d+)\s+ted/);
   if (cezTed) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezTed[1]) * 7); return relative(d); }
-  if (/čez\s+en\s+ted|čez\s+teden\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
 
   // English relative days/weeks
-  if (/\bin\s+a\s+day\b|\bin\s+one\s+day\b/.test(lower))   { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
-  if (/\bin\s+a\s+week\b|\bin\s+one\s+week\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
-  if (/\bin\s+two\s+weeks\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/\bin\s+a\s+day\b|\bin\s+one\s+day\b/.test(lower))     { const d = new Date(today); d.setDate(d.getDate() + 1);  return relative(d); }
+  if (/\bin\s+two\s+days?\b/.test(lower))                     { const d = new Date(today); d.setDate(d.getDate() + 2);  return relative(d); }
+  if (/\bin\s+three\s+days?\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 3);  return relative(d); }
+  if (/\bin\s+four\s+days?\b/.test(lower))                    { const d = new Date(today); d.setDate(d.getDate() + 4);  return relative(d); }
   const inDays = lower.match(/\bin\s+(\d+)\s+day/);
   if (inDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inDays[1])); return relative(d); }
+  if (/\bin\s+a\s+week\b|\bin\s+one\s+week\b/.test(lower))   { const d = new Date(today); d.setDate(d.getDate() + 7);  return relative(d); }
+  if (/\bin\s+two\s+weeks?\b/.test(lower))                    { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/\bin\s+three\s+weeks?\b/.test(lower))                  { const d = new Date(today); d.setDate(d.getDate() + 21); return relative(d); }
+  if (/\bin\s+four\s+weeks?\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 28); return relative(d); }
   const inWeeks = lower.match(/\bin\s+(\d+)\s+week/);
   if (inWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d); }
 
@@ -437,15 +444,64 @@ function extractDate(text) {
     }
   }
 
-  // "naslednji teden", "prihodnji teden", "next week" → next Monday
+  // Combined: "naslednji teden v petek" / "next week Friday" — MUST precede generic "naslednji teden"
+  if (/naslednji teden|prihodnji teden|drug teden/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+  }
+  if (/next week/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+  }
+
+  // "naslednji teden", "prihodnji teden", "next week" → next Monday (no specific weekday)
   if (/naslednji teden|prihodnji teden|drug teden|next week/.test(lower))
     return vague(getNextWeekday(1, true));
-  // end of week → Friday
+
+  // end of next week → next Friday
+  if (/konec naslednjega tedna|end of next week/.test(lower))
+    return weekday(getNextWeekday(5, true));
+  // end of week → this Friday
   if (/do konca tedna|konec tedna|end of (?:this |the )?week/.test(lower))
     return vague(getNextWeekday(5, false));
   // end of month → last day of current month
   if (/do konca meseca|konec meseca|end of (?:this |the )?month/.test(lower)) {
     const d = new Date(today); d.setMonth(d.getMonth() + 1, 0); return vague(d);
+  }
+
+  // "naslednji mesec [day]" / "next month [day]"
+  const nextMonthDaySL = lower.match(/naslednji mesec\s+(\d{1,2})/);
+  if (nextMonthDaySL) {
+    const d = new Date(today); d.setMonth(d.getMonth() + 1, parseInt(nextMonthDaySL[1])); return exact(d);
+  }
+  const nextMonthDayEN = lower.match(/next month(?:\s+on(?:\s+the)?)?\s+(\d{1,2})(?:st|nd|rd|th)?/);
+  if (nextMonthDayEN) {
+    const d = new Date(today); d.setMonth(d.getMonth() + 1, parseInt(nextMonthDayEN[1])); return exact(d);
+  }
+
+  // "prvi [weekday] naslednji mesec" / "first [weekday] next month"
+  function firstWeekdayOfMonth(year, month, targetDay) {
+    const d = new Date(year, month, 1);
+    while (d.getDay() !== targetDay) d.setDate(d.getDate() + 1);
+    return d;
+  }
+  if (/\bprv[ia]\b/.test(lower) && /naslednji mesec|prihodnji mesec/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) {
+        const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
+        return exact(firstWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+      }
+    }
+  }
+  if (/\bfirst\b/.test(lower) && /next month/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) {
+        const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
+        return exact(firstWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+      }
+    }
   }
 
   // Weekdays — "naslednji"/"prihodnji"/"next" force the NEXT occurrence even if today matches
@@ -514,6 +570,29 @@ function extractPriorityDate(text) {
   return eventDate ? eventDate.date : null;
 }
 
+// Strip date/time phrases for short single-line title extraction
+function stripDateTimePhrases(text) {
+  return text
+    .replace(/\bob\s+\d{1,2}(?:[.:]\d{2})?h?\b/gi, '')
+    .replace(/\b(?:at|@)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, '')
+    .replace(/\b\d{1,2}:\d{2}\b/g, '')
+    .replace(/\b(?:zjutraj|dopoldne|popoldne|zvečer|ponoči|morning|afternoon|evening|tonight|noon|midnight)\b/gi, '')
+    .replace(/\b(?:naslednji|prihodnji)\s+(?:teden|mesec)\b/gi, '')
+    .replace(/\b(?:naslednji[a-z]*|prihodnji[a-z]*|drug)\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bta\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bv\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bčez\s+(?:\w+\s+){0,2}(?:dan|dni|teden|tedne|uro|ur|minut)\b/gi, '')
+    .replace(/\b(?:jutri|danes|pojutrišnjem)\b/gi, '')
+    .replace(/\bnext\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\bthis\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\b(?:tomorrow|today|tonight)\b/gi, '')
+    .replace(/\bin\s+\w+\s+(?:days?|weeks?|hours?|minutes?)\b/gi, '')
+    .replace(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^\s*[,.\-–]\s*/, '')
+    .trim();
+}
+
 function extractTitle(text, businessContext) {
   const cleaned = text.replace(SIGNATURE_RE, '').trim();
 
@@ -523,6 +602,16 @@ function extractTitle(text, businessContext) {
   const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lep pozdrav|lp\b|dear\b)/i;
   const FILLER_START = /^(?:vesela bom[,.]?\s*(?:če\s*se\s*vidimo\.?)?|prosim\b|hvala\b|thank you\b)\s*/i;
   const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // For short single-line inputs, strip date/time phrases to extract the core noun
+  if (lines.length === 1) {
+    const stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    if (stripped.length >= 2 && !SKIP_RE.test(stripped)) {
+      const t = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+      return t.slice(0, 80);
+    }
+  }
+
   for (const line of lines) {
     let t = line.replace(GREETING_RE, '').trim();
     if (t.length < 4) continue;
@@ -647,6 +736,59 @@ function toDatetimeLocalValue(date) {
     .toISOString().slice(0, 16);
 }
 
+// EU 24h display format: "13. 5. 2026, 09:00"
+function formatEU24h(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getDate()}. ${date.getMonth() + 1}. ${date.getFullYear()}, ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+// Parse EU 24h format back to Date
+function parseEU24hDate(str) {
+  const m = str.trim().match(/^(\d{1,2})[.\s]+(\d{1,2})[.\s]+(\d{4})[,\s]+(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], 0, 0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Set both the hidden datetime-local and the visible EU display field
+function setRemindAt(date) {
+  const hidden  = document.getElementById('remindAt');
+  const display = document.getElementById('remindAtDisplay');
+  if (!date || isNaN(date.getTime())) {
+    hidden.value = '';
+    if (document.activeElement !== display) display.value = '';
+  } else {
+    hidden.value = toDatetimeLocalValue(date);
+    if (document.activeElement !== display) display.value = formatEU24h(date);
+  }
+}
+
+// Parse what the user typed into the display field and commit it
+function applyRemindAtDisplay() {
+  const display = document.getElementById('remindAtDisplay');
+  const text = display.value.trim();
+  if (!text) {
+    document.getElementById('remindAt').value = '';
+    updateTimingPreview();
+    updateFollowUpPreview();
+    return;
+  }
+  // Try strict EU format first, then natural language
+  let parsed = parseEU24hDate(text);
+  if (!parsed) {
+    const r = parseSmartReminderText(text, '0');
+    parsed = r.eventDate;
+  }
+  if (parsed && !isNaN(parsed.getTime())) {
+    document.getElementById('remindAt').value = toDatetimeLocalValue(parsed);
+    display.value = formatEU24h(parsed);
+  }
+  document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
+  updateTimingPreview();
+  updateFollowUpPreview();
+}
+
 // ── UX helpers ────────────────────────────────────────────────
 
 let lastParsedEventDate = null;
@@ -756,7 +898,7 @@ function recomputeSmartRemind() {
   } else {
     remindAt = applyReminderOffset(new Date(lastParsedEventDate), document.getElementById('smartOffset').value);
   }
-  document.getElementById('remindAt').value = toDatetimeLocalValue(remindAt);
+  setRemindAt(remindAt);
   const fmtOpts = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
   const previewReminderEl = document.getElementById('previewReminder');
   if (previewReminderEl) previewReminderEl.textContent = remindAt.toLocaleString('sl-SI', fmtOpts);
@@ -966,7 +1108,7 @@ async function editReminder(id) {
   exitPreviewMode();
   document.getElementById('title').value       = reminder.title;
   document.getElementById('description').value = reminder.description || '';
-  document.getElementById('remindAt').value    = toDatetimeLocalValue(new Date(reminder.remindAt));
+  setRemindAt(new Date(reminder.remindAt));
   document.getElementById('email').value       = reminder.email;
   lastParsedEventDate = null;
   updateDetectCard(null);
@@ -1059,7 +1201,7 @@ async function savePendingReminder() {
     const nextDay = new Date();
     nextDay.setDate(nextDay.getDate() + 1);
     nextDay.setHours(9, 0, 0, 0);
-    document.getElementById('remindAt').value = toDatetimeLocalValue(nextDay);
+    setRemindAt(nextDay);
     lastParsedEventDate = null;
     updateDetectCard(null);
     updateConfidenceIndicator(null);
@@ -1246,11 +1388,11 @@ document.getElementById('smartBtn').addEventListener('click', () => {
   document.getElementById('title').value       = title;
   document.getElementById('description').value = description;
 
-  const remindAtInput = document.getElementById('remindAt');
+  const displayInput = document.getElementById('remindAtDisplay');
 
   if (remindAt && confidence !== 'low' && confidence !== 'none') {
-    remindAtInput.value = toDatetimeLocalValue(remindAt);
-    remindAtInput.style.borderColor = '';
+    setRemindAt(remindAt);
+    displayInput.style.borderColor = '';
 
     const isPast = remindAt < new Date();
     if (isPast) {
@@ -1271,9 +1413,9 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     updateFollowUpPreview();
 
   } else {
-    remindAtInput.value = '';
-    remindAtInput.style.borderColor = 'var(--amber)';
-    setTimeout(() => { remindAtInput.style.borderColor = ''; }, 4500);
+    setRemindAt(null);
+    displayInput.style.borderColor = 'var(--amber)';
+    setTimeout(() => { displayInput.style.borderColor = ''; }, 4500);
 
     const errMsg = warning
       ? warning
@@ -1291,7 +1433,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
 // ── Quick Buttons ─────────────────────────────────────────────
 
 function setQuickTime(date, btn) {
-  document.getElementById('remindAt').value = toDatetimeLocalValue(date);
+  setRemindAt(date);
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   updateTimingPreview();
@@ -1314,17 +1456,19 @@ document.getElementById('quickNextWeek').addEventListener('click', function() {
   const d = getNextWeekday(1, true); d.setHours(9, 0, 0, 0); setQuickTime(d, this);
 });
 
-document.getElementById('remindAt').addEventListener('input', () => {
+document.getElementById('remindAtDisplay').addEventListener('blur', applyRemindAtDisplay);
+document.getElementById('remindAtDisplay').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { applyRemindAtDisplay(); e.preventDefault(); }
+});
+document.getElementById('remindAtDisplay').addEventListener('input', () => {
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
-  updateTimingPreview();
-  updateFollowUpPreview();
 });
 
 // ── Quick Edit Chips ──────────────────────────────────────────
 
 function applyChip(newDate) {
   if (!newDate || isNaN(newDate.getTime())) return;
-  document.getElementById('remindAt').value = toDatetimeLocalValue(newDate);
+  setRemindAt(newDate);
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
   updateFollowUpPreview();
@@ -1379,7 +1523,7 @@ function applyQuickDate() {
     return;
   }
 
-  document.getElementById('remindAt').value = toDatetimeLocalValue(result.eventDate);
+  setRemindAt(result.eventDate);
   document.getElementById('quickDateInput').value = '';
   document.querySelectorAll('.btn-quick').forEach(b => b.classList.remove('active'));
   updateTimingPreview();
@@ -1721,7 +1865,7 @@ window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); });
   const d = new Date();
   d.setDate(d.getDate() + 1);
   d.setHours(9, 0, 0, 0);
-  document.getElementById('remindAt').value = toDatetimeLocalValue(d);
+  setRemindAt(d);
 
   // Restore saved email — readonly is set in HTML to block browser autofill until this point
   const savedEmail = localStorage.getItem(EMAIL_KEY);

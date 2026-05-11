@@ -216,8 +216,9 @@
         </div>
 
         <div class="field">
-          <label for="remindAt">Datum in ura</label>
-          <input type="datetime-local" id="remindAt" />
+          <label for="remindAtDisplay">Datum in ura</label>
+          <input type="text" id="remindAtDisplay" placeholder="13. 5. 2026, 09:00 ali »jutri ob 9«" autocomplete="off" />
+          <input type="datetime-local" id="remindAt" class="remindAt-hidden" tabindex="-1" aria-hidden="true" />
           <div class="quick-btns">
             <button type="button" class="btn-quick" id="quickTodayNoon">Danes ob 12</button>
             <button type="button" class="btn-quick" id="quickTomorrow9">Jutri ob 9</button>

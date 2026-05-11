@@ -785,6 +785,11 @@ input.theme-color-input {
 [data-theme="night"] .detect-label   { color: #5ec882; }
 [data-theme="night"] .detect-badge   { color: #5ec882; background: rgba(94,200,130,0.12); }
 
+/* ── Hidden native datetime picker ─────────────────────────── */
+.remindAt-hidden {
+  display: none !important;
+}
+
 /* ── Timing Preview ─────────────────────────────────────────── */
 .timing-preview {
   margin-top: 8px;
