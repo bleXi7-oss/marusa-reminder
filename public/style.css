@@ -349,40 +349,6 @@ textarea { resize: vertical; }
   color: #fff;
 }
 
-/* ── Help Card ─────────────────────────────────────────────── */
-.help-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 20px;
-  margin-bottom: 12px;
-  font-size: 0.87rem;
-  line-height: 1.55;
-  color: var(--text);
-  animation: fadeIn 0.2s ease;
-}
-
-.help-card p { margin-bottom: 7px; }
-.help-card p:last-child { margin-bottom: 0; }
-
-.help-card strong { color: var(--accent); }
-
-.help-card code {
-  font-family: monospace;
-  background: var(--bg);
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-size: 0.85em;
-}
-
-.help-note {
-  margin-top: 10px;
-  padding: 8px 12px;
-  background: var(--amber-lt);
-  color: var(--amber);
-  border-radius: 8px;
-  font-size: 0.82rem;
-}
 
 /* ── Custom Offset ─────────────────────────────────────────── */
 .offset-row {
@@ -686,7 +652,6 @@ input.theme-color-input {
 [data-theme="night"] .preview-block   { background: #1e3828; border-color: #2d5040; }
 [data-theme="night"] .preview-value   { color: #c0e8cc; }
 [data-theme="night"] .preview-label   { color: #5ec882; }
-[data-theme="night"] .help-note       { background: #2a2010; color: #d4a85a; }
 [data-theme="night"] .badge-sent      { background: #1e3828; color: #5ec882; }
 [data-theme="night"] .badge-waiting   { background: #2a2010; color: #d4a85a; }
 

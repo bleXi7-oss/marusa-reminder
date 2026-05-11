@@ -610,6 +610,65 @@
           </div>
         </div>
 
+        <!-- 13: Za g33ke -->
+        <div class="help-section" data-keywords="geek tehnika frontend backend node express json localstorage parser regex resend api koda arhitektura varnost zasebnost podatki">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">🔩</span>
+            <span class="help-section-title">Za g33ke — kako to deluje</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Nič skrivnostnega. Tukaj je kar se dogaja pod pokrovom.</p>
+
+            <p><strong>Frontend</strong> — kar vidiš:</p>
+            <ul>
+              <li>Čist HTML + CSS + vanilla JavaScript. Brez Reacta, brez frameworkov, brez build stepa.</li>
+              <li>Vse animacije in interakcije so CSS/JS, strežnik ne ve za klike.</li>
+            </ul>
+
+            <p><strong>Backend</strong> — kar se dogaja na strežniku:</p>
+            <ul>
+              <li>Node.js + Express. En sam <code>server.js</code>.</li>
+              <li>Vsako minuto preveri, ali je čas za kakšen opomnik, in ga pošlje.</li>
+              <li>Opomniki so shranjeni v <code>data/reminders.json</code> — lokalna datoteka na strežniku, brez baze.</li>
+            </ul>
+
+            <p><strong>Lokalne nastavitve (localStorage v brskalniku):</strong></p>
+            <ul>
+              <li>Tema, ime aplikacije, slog, način (pametni/ročni), email — shranjeno pri tebi, ne na strežniku.</li>
+              <li>Izbrišeš jih z brisanjem podatkov spletnega mesta v nastavitvah brskalnika.</li>
+            </ul>
+
+            <p><strong>Parser datumov</strong> — brez AI:</p>
+            <ul>
+              <li>Le regexp vzorci. Nobenih zunanjih API-jev, nobene OpenAI. Hitro, brezplačno, predvidljivo.</li>
+              <li>Podpira slovenščino in angleščino. Ostale jezike bo morda delno razumel, morda ne.</li>
+            </ul>
+
+            <p><strong>Email pošiljanje:</strong></p>
+            <ul>
+              <li>Resend API (priporočeno) ali Gmail SMTP. Konfigurira se v <code>.env</code>.</li>
+              <li>Ključi za pošiljanje so <em>samo na strežniku</em> — frontend jih nikoli ne vidi.</li>
+            </ul>
+
+            <p><strong>APP_ACCESS_CODE:</strong></p>
+            <ul>
+              <li>Enostavna zaščita: vsak API klic mora vsebovati pravilen <code>X-App-Code</code> header.</li>
+              <li>Brskalnik pošlje kodo iz localStorage, ne shranjuje je nikjer drugje.</li>
+              <li><code>/api/health</code> je edina nezaščitena pot — vrne samo <code>protected: true/false</code>, brez skrivnosti.</li>
+            </ul>
+
+            <p><strong>Zasebnost / kaj aplikacija sploh pošilja:</strong></p>
+            <ul>
+              <li>Brskalnik pošlje strežniku le to, kar sam vpišeš v obrazec: naslov, opis, datum, email.</li>
+              <li>Aplikacija <strong>ne bere</strong> tvojih lokalnih datotek, stikov, zgodovine ali česarkoli drugega.</li>
+              <li>Browser obvestila delujejo samo, ker brskalnik sam pokliče svojo obvestilno logiko — aplikacija ne ve za vsebino tvojih obvestil, samo sproži opozorilo.</li>
+            </ul>
+
+            <p class="help-tip">💡 Celotna koda je dostopna na GitHubu (gumb Deploy v Render poveže repo direktno). Preglej jo, če ti ni jasno kaj. Ni lukenj.</p>
+          </div>
+        </div>
+
       </div><!-- /help-modal-body -->
     </div><!-- /help-modal-drawer -->
   </div><!-- /help-modal-overlay -->
