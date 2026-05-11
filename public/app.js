@@ -4,7 +4,7 @@ function formatDate(dateStr) {
   const d = new Date(dateStr);
   return d.toLocaleString('sl-SI', {
     weekday: 'short', day: 'numeric', month: 'short',
-    year: 'numeric', hour: '2-digit', minute: '2-digit',
+    year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
 
@@ -656,7 +656,7 @@ let allReminders = [];
 function formatSlDate(date) {
   return date.toLocaleString('sl-SI', {
     weekday: 'short', day: 'numeric', month: 'short',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
   });
 }
 
@@ -664,8 +664,8 @@ function updateDetectCard(eventDate, remindAt) {
   const card = document.getElementById('detectCard');
   if (!eventDate) { card.classList.add('hidden'); return; }
 
-  const fmtLong  = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' };
-  const fmtShort = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const fmtLong  = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+  const fmtShort = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
 
   document.getElementById('detectEventText').textContent  = eventDate.toLocaleString('sl-SI', fmtLong);
   const reminderLine = (!remindAt || remindAt.getTime() === eventDate.getTime())
@@ -757,7 +757,7 @@ function recomputeSmartRemind() {
     remindAt = applyReminderOffset(new Date(lastParsedEventDate), document.getElementById('smartOffset').value);
   }
   document.getElementById('remindAt').value = toDatetimeLocalValue(remindAt);
-  const fmtOpts = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const fmtOpts = { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
   const previewReminderEl = document.getElementById('previewReminder');
   if (previewReminderEl) previewReminderEl.textContent = remindAt.toLocaleString('sl-SI', fmtOpts);
   updateDetectCard(lastParsedEventDate, remindAt);
@@ -1119,7 +1119,7 @@ function enterPreviewMode(eventDate, remindAt) {
 
   const fmtOpts = {
     day: 'numeric', month: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
   };
 
   document.getElementById('previewTitle').textContent    = document.getElementById('title').value || '—';
