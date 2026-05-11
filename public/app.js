@@ -217,7 +217,7 @@ const BUSINESS_KEYWORDS = [
 ];
 
 const SL_DAYS = [
-  [/\bponedeljk/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
+  [/\bponedelj/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
   [/\bčetr/i, 4], [/\bpetek|\bpetk/i, 5], [/\bsobot/i, 6], [/\bnedelj/i, 0],
 ];
 const EN_DAYS = [
@@ -242,6 +242,39 @@ function getNextWeekday(targetDay, forceNext) {
   if (diff < 0 || (forceNext && diff === 0)) diff += 7;
   const d = new Date(today);
   d.setDate(today.getDate() + diff);
+  return d;
+}
+
+// Returns the occurrence of targetDay that falls inside the NEXT calendar week
+// (Mon–Sun). Always at least 1 day and at most 13 days in the future.
+// Used for "naslednji petek", "next Friday", "naslednji teden v petek", etc.
+function nextWeekWeekday(targetDay) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay();
+  // Days until the Monday that STARTS next week
+  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysToNextMonday);
+  // Offset within next week (Mon=0 … Sun=6)
+  const offset = targetDay === 0 ? 6 : targetDay - 1;
+  const d = new Date(nextMonday);
+  d.setDate(nextMonday.getDate() + offset);
+  return d;
+}
+
+// Returns the Nth occurrence (1-based) of targetDay in the given month
+function nthWeekdayOfMonth(year, month, targetDay, n) {
+  const d = new Date(year, month, 1);
+  while (d.getDay() !== targetDay) d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + (n - 1) * 7);
+  return d;
+}
+
+// Returns the last occurrence of targetDay in the given month
+function lastWeekdayOfMonth(year, month, targetDay) {
+  const d = new Date(year, month + 1, 0); // last calendar day of month
+  while (d.getDay() !== targetDay) d.setDate(d.getDate() - 1);
   return d;
 }
 
@@ -482,12 +515,12 @@ function extractDate(text) {
   // Combined: "naslednji teden v petek" / "next week Friday" — MUST precede generic "naslednji teden"
   if (/naslednji teden|prihodnji teden|drug teden/.test(lower)) {
     for (const [re, dayNum] of SL_DAYS) {
-      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+      if (re.test(lower)) return weekday(nextWeekWeekday(dayNum));
     }
   }
   if (/next week/.test(lower)) {
     for (const [re, dayNum] of EN_DAYS) {
-      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+      if (re.test(lower)) return weekday(nextWeekWeekday(dayNum));
     }
   }
 
@@ -497,7 +530,7 @@ function extractDate(text) {
 
   // end of next week → next Friday
   if (/konec naslednjega tedna|end of next week/.test(lower))
-    return weekday(getNextWeekday(5, true));
+    return weekday(nextWeekWeekday(5));
   // end of week → this Friday
   if (/do konca tedna|konec tedna|end of (?:this |the )?week/.test(lower))
     return vague(getNextWeekday(5, false));
@@ -516,36 +549,73 @@ function extractDate(text) {
     const d = new Date(today); d.setMonth(d.getMonth() + 1, parseInt(nextMonthDayEN[1])); return exact(d);
   }
 
-  // "prvi [weekday] naslednji mesec" / "first [weekday] next month"
-  function firstWeekdayOfMonth(year, month, targetDay) {
-    const d = new Date(year, month, 1);
-    while (d.getDay() !== targetDay) d.setDate(d.getDate() + 1);
-    return d;
-  }
-  if (/\bprv[ia]\b/.test(lower) && /naslednji mesec|prihodnji mesec/.test(lower)) {
+  // Ordinal weekday of next month (SL): "prvi/drugi/.../zadnji [weekday] naslednji mesec"
+  const SL_ORD_NTH = { prvi:1,prva:1,drugi:2,druga:2,tretji:3,tretja:3,četrti:4,četrta:4,peti:5,peta:5 };
+  const slOrdNM = lower.match(/\b(prvi|prva|drugi|druga|tretji|tretja|četrti|četrta|peti|peta|zadnji|zadnja)\b/);
+  if (slOrdNM && /naslednji mesec|prihodnji mesec/.test(lower)) {
     for (const [re, dayNum] of SL_DAYS) {
       if (re.test(lower)) {
         const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
-        return exact(firstWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+        const n = SL_ORD_NTH[slOrdNM[1]];
+        return exact(n
+          ? nthWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum, n)
+          : lastWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
       }
     }
   }
-  if (/\bfirst\b/.test(lower) && /next month/.test(lower)) {
+  // Ordinal weekday of next month (EN): "first/second/.../last [weekday] next month"
+  const EN_ORD_NTH = { first:1,second:2,third:3,fourth:4,fifth:5 };
+  const enOrdNM = lower.match(/\b(first|second|third|fourth|fifth|last)\b/);
+  if (enOrdNM && /next month/.test(lower)) {
     for (const [re, dayNum] of EN_DAYS) {
       if (re.test(lower)) {
         const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
-        return exact(firstWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+        const n = EN_ORD_NTH[enOrdNM[1]];
+        return exact(n
+          ? nthWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum, n)
+          : lastWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
       }
     }
   }
 
-  // Weekdays — "naslednji"/"prihodnji"/"next" force the NEXT occurrence even if today matches
+  // Last weekday of current (or next) month: "zadnji [weekday] v mesecu"
+  if (/\bzadnj[ia]\b/.test(lower) && !/naslednji mesec|prihodnji mesec|next month/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) {
+        let d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth(), dayNum);
+        if (d < today) d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth() + 1, dayNum);
+        return weekday(d);
+      }
+    }
+  }
+  // English: "last [weekday] of (the) month"
+  if (/\blast\b/.test(lower) && /\bof\s+(?:the\s+)?month\b/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) {
+        let d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth(), dayNum);
+        if (d < today) d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth() + 1, dayNum);
+        return weekday(d);
+      }
+    }
+  }
+
+  // "najkasneje do [weekday]" / "no later than [weekday]" — forceNext so diff===0 (today) still jumps ahead
+  if (/\bnajkasneje\b/.test(lower) || /\bno\s+later\s+than\b/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+  }
+
+  // Weekdays — "naslednji [weekday]" / "next [weekday]" → next calendar week via nextWeekWeekday
   const forceNext = /naslednji|prihodnji/.test(lower);
   for (const [re, dayNum] of SL_DAYS) {
-    if (re.test(lower)) return weekday(getNextWeekday(dayNum, forceNext));
+    if (re.test(lower)) return weekday(forceNext ? nextWeekWeekday(dayNum) : getNextWeekday(dayNum, false));
   }
   for (const [re, dayNum] of EN_DAYS) {
-    if (re.test(lower)) return weekday(getNextWeekday(dayNum, /\bnext\b/.test(lower)));
+    if (re.test(lower)) return weekday(/\bnext\b/.test(lower) ? nextWeekWeekday(dayNum) : getNextWeekday(dayNum, false));
   }
 
   // "end of day" → return today (time will be set to 17:00 by extractTime)
@@ -619,13 +689,39 @@ function extractPriorityDate(text) {
 function stripDateTimePhrases(text) {
   return text
     .replace(/\bob\s+\d{1,2}(?:[.:]\d{2})?h?\b/gi, '')
-    .replace(/\b(?:at|@)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi, '')
+    .replace(/\b(?:at|@)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/gi, '') // "at 12" or "at 9pm"
     .replace(/\b\d{1,2}:\d{2}\b/g, '')
     .replace(/\b(?:zjutraj|dopoldne|popoldne|zvečer|ponoči|morning|afternoon|evening|tonight|noon|midnight)\b/gi, '')
+    // End-of-period phrases (strip whole phrase before generic weekday/month handling)
+    .replace(/\bnajkasneje\s+do\s+(?:ponedeljka|torka|srede|četrtka|petka|sobote|nedelje)\b/gi, '')
+    .replace(/\bno\s+later\s+than\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\bdo\s+konca\s+meseca\b/gi, '')
+    .replace(/\bkonec\s+meseca\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?month\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?month\b/gi, '')
+    .replace(/\bdo\s+konca\s+tedna\b/gi, '')
+    .replace(/\bkonec\s+tedna\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?week\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?week\b/gi, '')
+    .replace(/\bdo\s+konca\s+dneva\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?day\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?day\b/gi, '')
+    // "do [weekday acc.]" / "by [weekday]"
+    .replace(/\bdo\s+(?:ponedeljka|torka|srede|četrtka|petka|sobote|nedelje)\b/gi, '')
+    .replace(/\bby\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    // Ordinal + weekday combos (SL and EN) — strip as a unit before standalone weekday strip
+    .replace(/\b(?:prvi|prva|drugi|druga|tretji|tretja|četrti|četrta|peti|peta|zadnji|zadnja)\s+(?:ponedeljek|torek|sred\w+|četrtek|petek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\b(?:first|second|third|fourth|fifth|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    // Named next-week/month
     .replace(/\b(?:naslednji|prihodnji)\s+(?:teden|mesec)\b/gi, '')
-    .replace(/\b(?:naslednji[a-z]*|prihodnji[a-z]*|drug)\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\b(?:naslednji\w*|prihodnji\w*|drug)\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
     .replace(/\bta\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
     .replace(/\bv\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    // "v mesecu" / "of (the) month" — leftover after ordinal+weekday strip
+    .replace(/\bv\s+(?:tem\s+)?mesecu\b/gi, '')
+    .replace(/\bof\s+(?:the\s+)?month\b/gi, '')
+    // Standalone Slovenian weekdays (nominative + common case forms)
+    .replace(/\b(?:ponedeljek|torek|sreda|sredo|sredin\w+|četrtek|petek|sobota|soboto|nedelja|nedeljo)\b/gi, '')
     .replace(/\bčez\s+(?:\w+\s+){0,2}(?:dan|dni|teden|tedne|uro|ur|minut)\b/gi, '')
     .replace(/\b(?:jutri|danes|pojutrišnjem)\b/gi, '')
     .replace(/\bnext\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
@@ -634,10 +730,10 @@ function stripDateTimePhrases(text) {
     .replace(/\bin\s+\w+\s+(?:days?|weeks?|hours?|minutes?)\b/gi, '')
     .replace(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
     // Deadline / payment phrases
-    .replace(/\bv\s+roku\s+\w+\s+\w+\b/gi, '')          // v roku petih dni / v roku dveh tednov
-    .replace(/\bv\s+(?:roku\s+)?\d+\s+\w+(?:\s+od\b.*)?/gi, '')  // v 5 dneh (od prejema...)
-    .replace(/\bwithin\s+(?:\d+|\w+)\s+\w+\b/gi, '')    // within 5 days / within five days
-    .replace(/\bnajkasneje\s+v\b[^,.]*/gi, '')           // najkasneje v 5 dneh...
+    .replace(/\bv\s+roku\s+\w+\s+\w+\b/gi, '')
+    .replace(/\bv\s+(?:roku\s+)?\d+\s+\w+(?:\s+od\b.*)?/gi, '')
+    .replace(/\bwithin\s+(?:\d+|\w+)\s+\w+\b/gi, '')
+    .replace(/\bnajkasneje\s+v\b[^,.]*/gi, '')
     .replace(/\bnajkasneje\b/gi, '')
     .replace(/\boziroma\b/gi, '')
     .replace(/\bčim prej\b/gi, '')
@@ -783,6 +879,8 @@ function parseSmartReminderText(text, offset) {
     confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
   } else if (tier === 'exact' || tier === 'relative' || tier === 'weekday') {
     confidence = 'medium'; confidenceReason = 'Ura ni bila najdena, uporabljena je privzeta 09:00.';
+  } else if (tier === 'vague' && timeResult) {
+    confidence = 'medium'; confidenceReason = 'Datum je okvirno določen, preveri.';
   } else {
     confidence = 'low'; confidenceReason = 'Datum je ohlapno določen, preveri.';
   }

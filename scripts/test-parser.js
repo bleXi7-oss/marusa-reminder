@@ -13,14 +13,36 @@ class MockDate extends RealDate {
   static now() { return MOCK_NOW.getTime(); }
 }
 MockDate.prototype = RealDate.prototype;
-// preserve static methods
 Object.setPrototypeOf(MockDate, RealDate);
 global.Date = MockDate;
 
-// ── Parser functions (copied from public/app.js) ─────────────────────────────
+// ── Parser functions (synced from public/app.js) ─────────────────────────────
+
+const GREETING_RE  = /^(zdravo|živjo|hej|hello|hi\b|lep pozdrav|dober dan|dear\b|pozdravljeni)[,!.\s]*/i;
+const SIGNATURE_RE = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards|kind regards|regards|cheers|hvala in lep pozdrav)[^\n]*/gi;
+
+const BUSINESS_KEYWORDS = [
+  { re: /\brač(un|una|unu|une|uni)\b|\binvoice\b/i,                              label: 'račun' },
+  { re: /\bplačil|\bpayment\b|\bunpaid\b|\boverdue\b/i,                          label: 'plačilo' },
+  { re: /\bdobavnic|\bdelivery note\b/i,                                          label: 'dobavnica' },
+  { re: /\bponudba|\bponudb|\bquotation\b|\bquote\b/i,                           label: 'ponudba' },
+  { re: /\bnaročiln|\border confirmation\b/i,                                    label: 'naročilnica' },
+  { re: /\bddv\b|\bvat\b/i,                                                      label: 'DDV' },
+  { re: /\bfollow.?up\b/i,                                                       label: 'follow-up' },
+  { re: /\bknjig|\baccounting\b/i,                                               label: 'računovodstvo' },
+  { re: /\bstranka|\bcustomer\b|\bclient\b/i,                                    label: 'stranka' },
+  { re: /\bdobavitelj|\bsupplier\b|\bvendor\b/i,                                 label: 'dobavitelj' },
+  { re: /\bopomin\b/i,                                                            label: 'opomin' },
+  { re: /\bizvršb/i,                                                              label: 'izvršba' },
+  { re: /\bzapadl[ae]\s+obveznost|\boutstanding\s+(?:balance|invoice)\b/i,       label: 'zapadle obveznosti' },
+  { re: /\bneporavnan|\bneplačan\b/i,                                             label: 'neporavnano' },
+  { re: /\bzadnji\s+opomin\b|\bfinal\s+notice\b/i,                               label: 'zadnji opomin' },
+  { re: /\bpayment\s+reminder\b|\breminder\s+notice\b/i,                         label: 'opomnik plačila' },
+  { re: /\bcollection\s+notice\b|\blegal\s+action\b|\bdebt\s+collect/i,          label: 'izterjava' },
+];
 
 const SL_DAYS = [
-  [/\bponedeljk/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
+  [/\bponedelj/i, 1], [/\btorek|\btork/i, 2], [/\bsred/i, 3],
   [/\bčetr/i, 4], [/\bpetek|\bpetk/i, 5], [/\bsobot/i, 6], [/\bnedelj/i, 0],
 ];
 const EN_DAYS = [
@@ -38,9 +60,6 @@ const EN_MONTHS = {
   jan:1, feb:2, mar:3, apr:4, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12,
 };
 
-const GREETING_RE  = /^(zdravo|živjo|hej|hello|hi\b|lep pozdrav|dober dan|dear\b|pozdravljeni)[,!.\s]*/i;
-const SIGNATURE_RE = /\n[ \t]*(lep pozdrav|l\.?p\.?|s spoštovanjem|best regards|kind regards|regards|cheers|hvala in lep pozdrav)[^\n]*/gi;
-
 function getNextWeekday(targetDay, forceNext) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -51,35 +70,30 @@ function getNextWeekday(targetDay, forceNext) {
   return d;
 }
 
-function extractRelativeMinutes(text) {
-  const lower = text.toLowerCase();
-  const SL_NUMS = { 'eno':1,'en':1,'ena':1,'dve':2,'dva':2,'tri':3,'štiri':4,'pet':5,'šest':6,'sedem':7,'osem':8,'devet':9,'deset':10 };
-  const EN_NUMS = { 'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10 };
+function nextWeekWeekday(targetDay) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay();
+  const daysToNextMonday = dow === 0 ? 1 : 8 - dow;
+  const nextMonday = new Date(today);
+  nextMonday.setDate(today.getDate() + daysToNextMonday);
+  const offset = targetDay === 0 ? 6 : targetDay - 1;
+  const d = new Date(nextMonday);
+  d.setDate(nextMonday.getDate() + offset);
+  return d;
+}
 
-  if (/čez\s+pol\s+ure/.test(lower))            return 30;
-  if (/in\s+half\s+an?\s+hour/.test(lower))     return 30;
+function nthWeekdayOfMonth(year, month, targetDay, n) {
+  const d = new Date(year, month, 1);
+  while (d.getDay() !== targetDay) d.setDate(d.getDate() + 1);
+  d.setDate(d.getDate() + (n - 1) * 7);
+  return d;
+}
 
-  const slMin = lower.match(/čez\s+(\d+)\s+minut/);
-  if (slMin) return parseInt(slMin[1]);
-  const slMinW = lower.match(/čez\s+(eno|en|dve|dva|tri|štiri|pet|šest|sedem|osem|deset)\s+minut/);
-  if (slMinW) return SL_NUMS[slMinW[1]] || 1;
-  const enMin = lower.match(/\bin\s+(\d+)\s+minut/);
-  if (enMin) return parseInt(enMin[1]);
-
-  if (/čez\s+eno\s+ur[oa]|čez\s+en\s+ur[oa]/.test(lower)) return 60;
-  if (/\bin\s+one\s+hour/.test(lower))          return 60;
-
-  const slHr = lower.match(/čez\s+(\d+)\s+ur[oiea]?\b/);
-  if (slHr) return parseInt(slHr[1]) * 60;
-  const slHrW = lower.match(/čez\s+(dve|dva|tri|štiri|pet|šest|sedem|osem|devet|deset)\s+ur/);
-  if (slHrW) return (SL_NUMS[slHrW[1]] || 1) * 60;
-
-  const enHr = lower.match(/\bin\s+(\d+)\s+hour/);
-  if (enHr) return parseInt(enHr[1]) * 60;
-  const enHrW = lower.match(/\bin\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+hour/);
-  if (enHrW) return (EN_NUMS[enHrW[1]] || 1) * 60;
-
-  return null;
+function lastWeekdayOfMonth(year, month, targetDay) {
+  const d = new Date(year, month + 1, 0);
+  while (d.getDay() !== targetDay) d.setDate(d.getDate() - 1);
+  return d;
 }
 
 function extractTime(text) {
@@ -130,6 +144,39 @@ function extractTime(text) {
   if (/\bdopoldne\b/.test(lower))                                                          return { hour:  9, minute: 0 };
   if (/\bpopoldne\b|\bafternoon\b/.test(lower))                                            return { hour: 14, minute: 0 };
   if (/\bzvečer\b|\bevening\b|\btonight\b/.test(lower))                                    return { hour: 18, minute: 0 };
+  if (/\btakoj\b|\bčim prej\b|\b(?:as\s+soon\s+as\s+possible|asap)\b|\burgentno\b|\bnujno\b|\bimmediately\b/.test(lower))
+    return { hour: 17, minute: 0 };
+
+  return null;
+}
+
+function extractRelativeMinutes(text) {
+  const lower = text.toLowerCase();
+  const SL_NUMS = { 'eno':1,'en':1,'ena':1,'dve':2,'dva':2,'tri':3,'štiri':4,'pet':5,'šest':6,'sedem':7,'osem':8,'devet':9,'deset':10 };
+  const EN_NUMS = { 'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10 };
+
+  if (/čez\s+pol\s+ure/.test(lower))            return 30;
+  if (/in\s+half\s+an?\s+hour/.test(lower))     return 30;
+
+  const slMin = lower.match(/čez\s+(\d+)\s+minut/);
+  if (slMin) return parseInt(slMin[1]);
+  const slMinW = lower.match(/čez\s+(eno|en|dve|dva|tri|štiri|pet|šest|sedem|osem|deset)\s+minut/);
+  if (slMinW) return SL_NUMS[slMinW[1]] || 1;
+  const enMin = lower.match(/\bin\s+(\d+)\s+minut/);
+  if (enMin) return parseInt(enMin[1]);
+
+  if (/čez\s+eno\s+ur[oa]|čez\s+en\s+ur[oa]/.test(lower)) return 60;
+  if (/\bin\s+one\s+hour/.test(lower))          return 60;
+
+  const slHr = lower.match(/čez\s+(\d+)\s+ur[oiea]?\b/);
+  if (slHr) return parseInt(slHr[1]) * 60;
+  const slHrW = lower.match(/čez\s+(dve|dva|tri|štiri|pet|šest|sedem|osem|devet|deset)\s+ur/);
+  if (slHrW) return (SL_NUMS[slHrW[1]] || 1) * 60;
+
+  const enHr = lower.match(/\bin\s+(\d+)\s+hour/);
+  if (enHr) return parseInt(enHr[1]) * 60;
+  const enHrW = lower.match(/\bin\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+hour/);
+  if (enHrW) return (EN_NUMS[enHrW[1]] || 1) * 60;
 
   return null;
 }
@@ -144,7 +191,7 @@ function extractDate(text) {
   const weekday  = d => ({ date: d, tier: 'weekday'  });
   const vague    = d => ({ date: d, tier: 'vague'    });
 
-  if (/\bdanes\b|\btoday\b|\bdue today\b|\brok je danes\b/.test(lower))    return relative(new Date(today));
+  if (/\bdanes\b|\btoday\b|\bdue today\b|\brok je danes\b|\btonight\b/.test(lower))    return relative(new Date(today));
 
   if (/\bjutri\b|\btomorrow\b|\bdue tomorrow\b|\brok je jutri\b/.test(lower)) {
     const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d);
@@ -160,16 +207,23 @@ function extractDate(text) {
   const cezDni = lower.match(/čez\s+(\d+)\s+dn/);
   if (cezDni) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezDni[1])); return relative(d); }
 
-  if (/čez\s+dv[ae]\s+ted/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/čez\s+en\s+ted|čez\s+teden\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7);  return relative(d); }
+  if (/čez\s+dv[ae]\s+ted/.test(lower))            { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/čez\s+tri\s+ted/.test(lower))               { const d = new Date(today); d.setDate(d.getDate() + 21); return relative(d); }
+  if (/čez\s+štiri\s+ted/.test(lower))             { const d = new Date(today); d.setDate(d.getDate() + 28); return relative(d); }
   const cezTed = lower.match(/čez\s+(\d+)\s+ted/);
   if (cezTed) { const d = new Date(today); d.setDate(d.getDate() + parseInt(cezTed[1]) * 7); return relative(d); }
-  if (/čez\s+en\s+ted|čez\s+teden\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
 
-  if (/\bin\s+a\s+day\b|\bin\s+one\s+day\b/.test(lower))   { const d = new Date(today); d.setDate(d.getDate() + 1); return relative(d); }
-  if (/\bin\s+a\s+week\b|\bin\s+one\s+week\b/.test(lower)) { const d = new Date(today); d.setDate(d.getDate() + 7); return relative(d); }
-  if (/\bin\s+two\s+weeks\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/\bin\s+a\s+day\b|\bin\s+one\s+day\b/.test(lower))     { const d = new Date(today); d.setDate(d.getDate() + 1);  return relative(d); }
+  if (/\bin\s+two\s+days?\b/.test(lower))                     { const d = new Date(today); d.setDate(d.getDate() + 2);  return relative(d); }
+  if (/\bin\s+three\s+days?\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 3);  return relative(d); }
+  if (/\bin\s+four\s+days?\b/.test(lower))                    { const d = new Date(today); d.setDate(d.getDate() + 4);  return relative(d); }
   const inDays = lower.match(/\bin\s+(\d+)\s+day/);
   if (inDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inDays[1])); return relative(d); }
+  if (/\bin\s+a\s+week\b|\bin\s+one\s+week\b/.test(lower))   { const d = new Date(today); d.setDate(d.getDate() + 7);  return relative(d); }
+  if (/\bin\s+two\s+weeks?\b/.test(lower))                    { const d = new Date(today); d.setDate(d.getDate() + 14); return relative(d); }
+  if (/\bin\s+three\s+weeks?\b/.test(lower))                  { const d = new Date(today); d.setDate(d.getDate() + 21); return relative(d); }
+  if (/\bin\s+four\s+weeks?\b/.test(lower))                   { const d = new Date(today); d.setDate(d.getDate() + 28); return relative(d); }
   const inWeeks = lower.match(/\bin\s+(\d+)\s+week/);
   if (inWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(inWeeks[1]) * 7); return relative(d); }
 
@@ -237,26 +291,166 @@ function extractDate(text) {
     }
   }
 
+  const SL_ORD = { 'enega':1,'enem':1,'dveh':2,'dvema':2,'treh':3,'štirih':4,'petih':5,'šestih':6,'sedmih':7,'osmih':8,'devetih':9,'desetih':10,'petnajstih':15,'trideset':30,'tridesetih':30 };
+  const vRokuTedW = lower.match(/\bv\s+roku\s+(\w+)\s+tede?n/);
+  if (vRokuTedW) { const weeks = SL_ORD[vRokuTedW[1]] || parseInt(vRokuTedW[1]) || 1; const d = new Date(today); d.setDate(d.getDate() + weeks * 7); return { date: d, tier: 'deadline' }; }
+  const vTednih = lower.match(/\bv\s+(?:roku\s+)?(\d+)\s+tede?n/);
+  if (vTednih) { const d = new Date(today); d.setDate(d.getDate() + parseInt(vTednih[1]) * 7); return { date: d, tier: 'deadline' }; }
+
+  const vDnehNum = lower.match(/\bv\s+(?:roku\s+)?(\d+)\s+dn/);
+  if (vDnehNum) { const d = new Date(today); d.setDate(d.getDate() + parseInt(vDnehNum[1])); return { date: d, tier: 'deadline' }; }
+  const vDnehWord = lower.match(/\bv\s+(?:roku\s+)?(\w+)\s+dn/);
+  if (vDnehWord && SL_ORD[vDnehWord[1]] !== undefined) { const d = new Date(today); d.setDate(d.getDate() + SL_ORD[vDnehWord[1]]); return { date: d, tier: 'deadline' }; }
+
+  const EN_ORD_W = { 'one':1,'two':2,'three':3,'four':4,'five':5,'six':6,'seven':7,'eight':8,'nine':9,'ten':10,'fourteen':14,'fifteen':15,'thirty':30 };
+  const withinDays = lower.match(/\bwithin\s+(\d+)\s+days?\b/);
+  if (withinDays) { const d = new Date(today); d.setDate(d.getDate() + parseInt(withinDays[1])); return { date: d, tier: 'deadline' }; }
+  const withinDaysW = lower.match(/\bwithin\s+(one|two|three|four|five|six|seven|eight|nine|ten|fourteen|fifteen|thirty)\s+days?\b/);
+  if (withinDaysW && EN_ORD_W[withinDaysW[1]]) { const d = new Date(today); d.setDate(d.getDate() + EN_ORD_W[withinDaysW[1]]); return { date: d, tier: 'deadline' }; }
+  const withinWeeks = lower.match(/\bwithin\s+(\d+)\s+weeks?\b/);
+  if (withinWeeks) { const d = new Date(today); d.setDate(d.getDate() + parseInt(withinWeeks[1]) * 7); return { date: d, tier: 'deadline' }; }
+
+  if (/naslednji teden|prihodnji teden|drug teden/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) return weekday(nextWeekWeekday(dayNum));
+    }
+  }
+  if (/next week/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) return weekday(nextWeekWeekday(dayNum));
+    }
+  }
+
   if (/naslednji teden|prihodnji teden|drug teden|next week/.test(lower))
     return vague(getNextWeekday(1, true));
+
+  if (/konec naslednjega tedna|end of next week/.test(lower))
+    return weekday(nextWeekWeekday(5));
   if (/do konca tedna|konec tedna|end of (?:this |the )?week/.test(lower))
     return vague(getNextWeekday(5, false));
   if (/do konca meseca|konec meseca|end of (?:this |the )?month/.test(lower)) {
     const d = new Date(today); d.setMonth(d.getMonth() + 1, 0); return vague(d);
   }
 
+  const nextMonthDaySL = lower.match(/naslednji mesec\s+(\d{1,2})/);
+  if (nextMonthDaySL) {
+    const d = new Date(today); d.setMonth(d.getMonth() + 1, parseInt(nextMonthDaySL[1])); return exact(d);
+  }
+  const nextMonthDayEN = lower.match(/next month(?:\s+on(?:\s+the)?)?\s+(\d{1,2})(?:st|nd|rd|th)?/);
+  if (nextMonthDayEN) {
+    const d = new Date(today); d.setMonth(d.getMonth() + 1, parseInt(nextMonthDayEN[1])); return exact(d);
+  }
+
+  const SL_ORD_NTH = { prvi:1,prva:1,drugi:2,druga:2,tretji:3,tretja:3,četrti:4,četrta:4,peti:5,peta:5 };
+  const slOrdNM = lower.match(/\b(prvi|prva|drugi|druga|tretji|tretja|četrti|četrta|peti|peta|zadnji|zadnja)\b/);
+  if (slOrdNM && /naslednji mesec|prihodnji mesec/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) {
+        const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
+        const n = SL_ORD_NTH[slOrdNM[1]];
+        return exact(n
+          ? nthWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum, n)
+          : lastWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+      }
+    }
+  }
+  const EN_ORD_NTH = { first:1,second:2,third:3,fourth:4,fifth:5 };
+  const enOrdNM = lower.match(/\b(first|second|third|fourth|fifth|last)\b/);
+  if (enOrdNM && /next month/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) {
+        const nm = new Date(today); nm.setMonth(nm.getMonth() + 1);
+        const n = EN_ORD_NTH[enOrdNM[1]];
+        return exact(n
+          ? nthWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum, n)
+          : lastWeekdayOfMonth(nm.getFullYear(), nm.getMonth(), dayNum));
+      }
+    }
+  }
+
+  if (/\bzadnj[ia]\b/.test(lower) && !/naslednji mesec|prihodnji mesec|next month/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) {
+        let d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth(), dayNum);
+        if (d < today) d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth() + 1, dayNum);
+        return weekday(d);
+      }
+    }
+  }
+  if (/\blast\b/.test(lower) && /\bof\s+(?:the\s+)?month\b/.test(lower)) {
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) {
+        let d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth(), dayNum);
+        if (d < today) d = lastWeekdayOfMonth(today.getFullYear(), today.getMonth() + 1, dayNum);
+        return weekday(d);
+      }
+    }
+  }
+
+  // "najkasneje do [weekday]" / "no later than [weekday]" — forceNext so diff===0 (today) still jumps ahead
+  if (/\bnajkasneje\b/.test(lower) || /\bno\s+later\s+than\b/.test(lower)) {
+    for (const [re, dayNum] of SL_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+    for (const [re, dayNum] of EN_DAYS) {
+      if (re.test(lower)) return weekday(getNextWeekday(dayNum, true));
+    }
+  }
+
   const forceNext = /naslednji|prihodnji/.test(lower);
   for (const [re, dayNum] of SL_DAYS) {
-    if (re.test(lower)) return weekday(getNextWeekday(dayNum, forceNext));
+    if (re.test(lower)) return weekday(forceNext ? nextWeekWeekday(dayNum) : getNextWeekday(dayNum, false));
   }
   for (const [re, dayNum] of EN_DAYS) {
-    if (re.test(lower)) return weekday(getNextWeekday(dayNum, /\bnext\b/.test(lower)));
+    if (re.test(lower)) return weekday(/\bnext\b/.test(lower) ? nextWeekWeekday(dayNum) : getNextWeekday(dayNum, false));
   }
 
   if (/konec dneva|do konca dneva|\beod\b|\bcob\b|end of (?:the )?day/.test(lower))
     return relative(new Date(today));
 
+  if (/\btakoj\b|\bčim prej\b|\b(?:as\s+soon\s+as\s+possible|asap)\b|\burgentno\b|\bnujno\b|\bimmediately\b/.test(lower))
+    return relative(new Date(today));
+
   return { date: null, tier: null };
+}
+
+function detectUrgency(text) {
+  return /\bnujno\b|\burgent\b|\basap\b|\btakoj\b|\bčim prej\b|\bimmediately\b/.test(text.toLowerCase());
+}
+
+function countDateSignals(text) {
+  let n = 0;
+  if (/\bdanes\b|\btoday\b/i.test(text))   n++;
+  if (/\bjutri\b|\btomorrow\b/i.test(text)) n++;
+  if (/\d{1,2}\.\d{1,2}/.test(text))       n++;
+  if (/\d{1,2}\/\d{1,2}/.test(text))       n++;
+  for (const [re] of [...SL_DAYS, ...EN_DAYS]) if (re.test(text)) { n++; break; }
+  return n;
+}
+
+function detectBusinessContext(text) {
+  for (const { re, label } of BUSINESS_KEYWORDS) {
+    if (re.test(text)) return label;
+  }
+  return null;
+}
+
+function stripDeadlineTail(text) {
+  return text
+    .replace(/\s*\bpričakujem\b.*$/i, '')
+    .replace(/\s*\bprosim\b.*$/i, '')
+    .replace(/\s*\bhvala\b.*$/i, '')
+    .replace(/\s*\bthank you\b.*$/i, '')
+    .replace(/\s*\b(?:do\s+(?:danes|jutri|petka|srede|torka|četrtka|sobote|nedelje|konca|naslednjega)|by\s+(?:today|tomorrow|friday|monday|tuesday|wednesday|thursday|saturday|sunday|end|the\s+end))\b.*$/i, '')
+    .replace(/\s*\bnajkasnej(?:e|š[ae])\b.*$/i, '')
+    .replace(/\s*\boziroma\s+najkasnej\w*\b.*$/i, '')
+    .replace(/\s*\bod\s+prejema\b.*$/i, '')
+    .replace(/\s*\bv\s+(?:roku\s+)?\d+\s+dn\w*\b.*$/i, '')
+    .replace(/\s*\bwithin\s+\d+\s+days?\b.*$/i, '')
+    .replace(/\s*\bčim prej\b.*$/i, '')
+    .replace(/\s*,?\s*(?:čim prej|takoj|asap|urgentno|nujno)\s*$/i, '')
+    .replace(/\s*[,.]$/, '')
+    .trim();
 }
 
 function extractPriorityDate(text) {
@@ -275,6 +469,113 @@ function extractPriorityDate(text) {
   return eventDate ? eventDate.date : null;
 }
 
+function stripDateTimePhrases(text) {
+  return text
+    .replace(/\bob\s+\d{1,2}(?:[.:]\d{2})?h?\b/gi, '')
+    .replace(/\b(?:at|@)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/gi, '')
+    .replace(/\b\d{1,2}:\d{2}\b/g, '')
+    .replace(/\b(?:zjutraj|dopoldne|popoldne|zvečer|ponoči|morning|afternoon|evening|tonight|noon|midnight)\b/gi, '')
+    .replace(/\bnajkasneje\s+do\s+(?:ponedeljka|torka|srede|četrtka|petka|sobote|nedelje)\b/gi, '')
+    .replace(/\bno\s+later\s+than\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\bdo\s+konca\s+meseca\b/gi, '')
+    .replace(/\bkonec\s+meseca\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?month\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?month\b/gi, '')
+    .replace(/\bdo\s+konca\s+tedna\b/gi, '')
+    .replace(/\bkonec\s+tedna\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?week\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?week\b/gi, '')
+    .replace(/\bdo\s+konca\s+dneva\b/gi, '')
+    .replace(/\bby\s+(?:the\s+)?end\s+of\s+(?:the\s+)?day\b/gi, '')
+    .replace(/\bend\s+of\s+(?:the\s+)?day\b/gi, '')
+    .replace(/\bdo\s+(?:ponedeljka|torka|srede|četrtka|petka|sobote|nedelje)\b/gi, '')
+    .replace(/\bby\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\b(?:prvi|prva|drugi|druga|tretji|tretja|četrti|četrta|peti|peta|zadnji|zadnja)\s+(?:ponedeljek|torek|sred\w+|četrtek|petek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\b(?:first|second|third|fourth|fifth|last)\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\b(?:naslednji|prihodnji)\s+(?:teden|mesec)\b/gi, '')
+    .replace(/\b(?:naslednji\w*|prihodnji\w*|drug)\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bta\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bv\s+(?:petek|ponedeljek|torek|sred[oa]|četrtek|soboto?|nedeljo?)\b/gi, '')
+    .replace(/\bv\s+(?:tem\s+)?mesecu\b/gi, '')
+    .replace(/\bof\s+(?:the\s+)?month\b/gi, '')
+    .replace(/\b(?:ponedeljek|torek|sreda|sredo|sredin\w+|četrtek|petek|sobota|soboto|nedelja|nedeljo)\b/gi, '')
+    .replace(/\bčez\s+(?:\w+\s+){0,2}(?:dan|dni|teden|tedne|uro|ur|minut)\b/gi, '')
+    .replace(/\b(?:jutri|danes|pojutrišnjem)\b/gi, '')
+    .replace(/\bnext\s+(?:week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\bthis\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\b(?:tomorrow|today|tonight)\b/gi, '')
+    .replace(/\bin\s+\w+\s+(?:days?|weeks?|hours?|minutes?)\b/gi, '')
+    .replace(/\b(?:on\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, '')
+    .replace(/\bv\s+roku\s+\w+\s+\w+\b/gi, '')
+    .replace(/\bv\s+(?:roku\s+)?\d+\s+\w+(?:\s+od\b.*)?/gi, '')
+    .replace(/\bwithin\s+(?:\d+|\w+)\s+\w+\b/gi, '')
+    .replace(/\bnajkasneje\s+v\b[^,.]*/gi, '')
+    .replace(/\bnajkasneje\b/gi, '')
+    .replace(/\boziroma\b/gi, '')
+    .replace(/\bčim prej\b/gi, '')
+    .replace(/\btakoj\b/gi, '')
+    .replace(/\b(?:urgentno|nujno|asap)\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^\s*[,.\-–]\s*/, '')
+    .trim();
+}
+
+const BUSINESS_FILLER_RE = /^(?:prosimo,?\s*(?:da\s*|za\s*)?|pričakujemo\s*(?:plačilo\s*|odgovor\s*)?|please\s+(?:pay|settle|send|reply|respond|submit|review|note|be\s+advised)\s*(?:the\s+)?|kindly\s*(?:note\s*)?|note\s+that\s*)/i;
+
+function extractTitle(text, businessContext) {
+  const cleaned = text.replace(SIGNATURE_RE, '').trim();
+
+  const subj = cleaned.match(/^(?:subject|zadeva):\s*(.+)/im);
+  if (subj) return subj[1].trim().slice(0, 80);
+
+  const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lep pozdrav|lp\b|dear\b)/i;
+  const FILLER_START = /^(?:vesela bom[,.]?\s*(?:če\s*se\s*vidimo\.?)?|prosim\b|hvala\b|thank you\b)\s*/i;
+  const lines = cleaned.split('\n').map(l => l.trim()).filter(Boolean);
+
+  if (lines.length === 1) {
+    let stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    stripped = stripped.replace(BUSINESS_FILLER_RE, '').trim();
+    stripped = stripDeadlineTail(stripped);
+    if (stripped.length < 8 && /^(?:reply|respond|answer|submit|check)\s*$/i.test(stripped)) {
+      const reg = lines[0].match(/\bregarding\s+(.{3,50}?)(?:\s+within\b|\.|,|$)/i);
+      if (reg) stripped = reg[1].trim();
+    }
+    if (stripped.length >= 2 && !SKIP_RE.test(stripped)) {
+      const t = stripped.charAt(0).toUpperCase() + stripped.slice(1);
+      return t.slice(0, 80);
+    }
+  }
+
+  for (const line of lines) {
+    let t = line.replace(GREETING_RE, '').trim();
+    if (t.length < 4) continue;
+    if (SKIP_RE.test(t)) continue;
+    t = t.replace(FILLER_START, '').trim();
+    t = t.replace(BUSINESS_FILLER_RE, '').trim();
+    if (t.length < 4) continue;
+    t = t.replace(/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\s+/, '');
+    t = t.replace(/^please\s+/i, '');
+    t = stripDeadlineTail(t);
+    if (t.length < 4) continue;
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    return t.slice(0, 80);
+  }
+
+  if (businessContext) return `Preveri ${businessContext}`;
+  return cleaned.slice(0, 80).trim();
+}
+
+function extractDescription(text) {
+  const SKIP_RE = /^(zdravo|živjo|hej|hello|hi\b|pozdravljeni|hvala|lp\b|lep pozdrav|dear\b|s spoštovanjem)/i;
+  const cleaned = text.replace(SIGNATURE_RE, '').trim();
+  const lines = cleaned.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length >= 8)
+    .filter(l => !SKIP_RE.test(l))
+    .filter(l => !/^(?:subject|zadeva):/i.test(l));
+  return lines.slice(0, 2).join(' ').replace(/\s+/g, ' ').slice(0, 140).trim();
+}
+
 function applyReminderOffset(date, offset) {
   const d = new Date(date);
   if (offset === '10m') d.setMinutes(d.getMinutes() - 10);
@@ -290,32 +591,66 @@ function applyReminderOffset(date, offset) {
 }
 
 function parseSmartReminderText(text, offset) {
-  offset = offset || '0';
-
-  let { date: rawDate, tier } = extractDate(text);
-  const timeResult = extractTime(text);
+  const businessContext = detectBusinessContext(text);
+  const title           = extractTitle(text, businessContext);
+  const description     = extractDescription(text);
 
   const relMins = extractRelativeMinutes(text);
   if (relMins !== null) {
     const now = new Date();
     now.setSeconds(0, 0);
     now.setMinutes(now.getMinutes() + relMins);
-    return { eventDate: now, remindAt: now, tier: 'relative', timeResult };
+    return { title, eventDate: now, remindAt: now, description, confidence: 'high', confidenceReason: 'Zaznano relativno besedilo z jasnim časom.', warning: null, businessContext };
   }
 
-  const priorityDate = extractPriorityDate(text);
-  if (priorityDate) { rawDate = priorityDate; tier = 'exact'; }
+  let { date: rawDate, tier } = extractDate(text);
+  const timeResult = extractTime(text);
+  const multiDate  = countDateSignals(text) >= 2;
+  const urgent     = detectUrgency(text);
 
-  if (!rawDate) return { eventDate: null, remindAt: null, tier: null, timeResult };
+  const priorityDate = extractPriorityDate(text);
+  if (priorityDate) {
+    rawDate = priorityDate;
+    tier = 'exact';
+  }
+
+  if (!rawDate) {
+    return {
+      title, eventDate: null, remindAt: null, description, confidence: 'none', confidenceReason: 'Datum ni bil zaznan.', businessContext,
+      warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
+    };
+  }
 
   const eventDate = new Date(rawDate);
-  eventDate.setHours(timeResult ? timeResult.hour : 9, timeResult ? timeResult.minute : 0, 0, 0);
+  eventDate.setHours(
+    timeResult ? timeResult.hour   : 9,
+    timeResult ? timeResult.minute : 0,
+    0, 0
+  );
+
+  let confidence, confidenceReason;
+  if (tier === 'deadline') {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen rok (plačilni/odgovorni rok).';
+  } else if (tier === 'exact' && timeResult) {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
+  } else if ((tier === 'relative' || tier === 'weekday') && timeResult) {
+    confidence = 'high'; confidenceReason = 'Zaznan jasen datum in ura.';
+  } else if (tier === 'exact' || tier === 'relative' || tier === 'weekday') {
+    confidence = 'medium'; confidenceReason = 'Ura ni bila najdena, uporabljena je privzeta 09:00.';
+  } else if (tier === 'vague' && timeResult) {
+    confidence = 'medium'; confidenceReason = 'Datum je okvirno določen, preveri.';
+  } else {
+    confidence = 'low'; confidenceReason = 'Datum je ohlapno določen, preveri.';
+  }
+
+  const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
+  if (multiDate) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
 
   return {
+    title,
     eventDate,
-    remindAt: applyReminderOffset(new Date(eventDate), offset),
-    tier,
-    timeResult,
+    remindAt: applyReminderOffset(new Date(eventDate), offset || '0'),
+    description, confidence, confidenceReason, warning, businessContext,
   };
 }
 
@@ -349,6 +684,18 @@ function check(label, actual, expected) {
   }
 }
 
+function checkStr(label, actual, expected) {
+  if (actual === expected) {
+    console.log(`  PASS  ${label}`);
+    pass++;
+  } else {
+    console.log(`  FAIL  ${label}`);
+    console.log(`        got:      "${actual}"`);
+    console.log(`        expected: "${expected}"`);
+    fail++;
+  }
+}
+
 function checkTime(label, text, expectedH, expectedM) {
   const t = extractTime(text);
   const ok = t && t.hour === expectedH && t.minute === expectedM;
@@ -369,203 +716,228 @@ function smartDate(text) {
   return parseSmartReminderText(text, '0').eventDate;
 }
 
+function smartTitle(text) {
+  return parseSmartReminderText(text, '0').title;
+}
+
 // NOW = Monday 2026-05-11 09:00
-const NOW    = MOCK_NOW;
-const TODAY  = new Date(2026, 4, 11, 0, 0, 0, 0);
-const TOMRW  = new Date(2026, 4, 12, 0, 0, 0, 0);
+// Next Friday = 2026-05-15
+// End of May = 2026-05-31
+// First Monday of June 2026 = 2026-06-01
+
+console.log('\n=== REQUIRED CASES (SL + EN) ===\n');
+
+// SL1: naslednji petek ob 12h oddaj poročilo → NEXT WEEK's Fri 22 May 12:00, title "Oddaj poročilo"
+check('SL1 date: naslednji petek ob 12h oddaj poročilo → Fri 22 May 12:00',
+  smartDate('naslednji petek ob 12h oddaj poročilo'), dt(2026,5,22,12,0));
+checkStr('SL1 title: naslednji petek ob 12h oddaj poročilo → "Oddaj poročilo"',
+  smartTitle('naslednji petek ob 12h oddaj poročilo'), 'Oddaj poročilo');
+
+// SL2: do konca meseca pripravi poročilo → 31 May 17:00, title "Pripravi poročilo"
+check('SL2 date: do konca meseca pripravi poročilo → 31 May 17:00',
+  smartDate('do konca meseca pripravi poročilo'), dt(2026,5,31,17,0));
+checkStr('SL2 title: do konca meseca pripravi poročilo → "Pripravi poročilo"',
+  smartTitle('do konca meseca pripravi poročilo'), 'Pripravi poročilo');
+
+// SL3: prvi ponedeljek naslednji mesec sestanek → 1 Jun 09:00, title "Sestanek"
+check('SL3 date: prvi ponedeljek naslednji mesec sestanek → Mon 1 Jun 09:00',
+  smartDate('prvi ponedeljek naslednji mesec sestanek'), dt(2026,6,1,9,0));
+checkStr('SL3 title: prvi ponedeljek naslednji mesec sestanek → "Sestanek"',
+  smartTitle('prvi ponedeljek naslednji mesec sestanek'), 'Sestanek');
+
+// EN4: next Friday at 12 submit report → NEXT WEEK's Fri 22 May 12:00, title "Submit report"
+check('EN4 date: next Friday at 12 submit report → Fri 22 May 12:00',
+  smartDate('next Friday at 12 submit report'), dt(2026,5,22,12,0));
+checkStr('EN4 title: next Friday at 12 submit report → "Submit report"',
+  smartTitle('next Friday at 12 submit report'), 'Submit report');
+
+// EN5: prepare report by the end of the month → 31 May 17:00, title "Prepare report"
+check('EN5 date: prepare report by the end of the month → 31 May 17:00',
+  smartDate('prepare report by the end of the month'), dt(2026,5,31,17,0));
+checkStr('EN5 title: prepare report by the end of the month → "Prepare report"',
+  smartTitle('prepare report by the end of the month'), 'Prepare report');
+
+// EN6: first Monday next month meeting → Mon 1 Jun 09:00, title "Meeting"
+check('EN6 date: first Monday next month meeting → Mon 1 Jun 09:00',
+  smartDate('first Monday next month meeting'), dt(2026,6,1,9,0));
+checkStr('EN6 title: first Monday next month meeting → "Meeting"',
+  smartTitle('first Monday next month meeting'), 'Meeting');
+
+console.log('\n=== ADDITIONAL PHRASE COVERAGE ===\n');
+
+// zadnji petek v mesecu → last Friday of May = 29 May 09:00
+check('zadnji petek v mesecu → Fri 29 May 09:00',
+  smartDate('zadnji petek v mesecu preglej poročilo'), dt(2026,5,29,9,0));
+checkStr('zadnji petek v mesecu title → "Preglej poročilo"',
+  smartTitle('zadnji petek v mesecu preglej poročilo'), 'Preglej poročilo');
+
+// drugi torek naslednji mesec → 2nd Tuesday of June = 9 Jun 09:00
+check('drugi torek naslednji mesec → Tue 9 Jun 09:00',
+  smartDate('drugi torek naslednji mesec sestanek'), dt(2026,6,9,9,0));
+
+// konec tedna → Fri 15 May 17:00
+check('konec tedna → Fri 15 May 17:00',
+  smartDate('konec tedna oddaj naloge'), dt(2026,5,15,17,0));
+
+// do petka → this Fri 15 May 09:00
+check('do petka → Fri 15 May 09:00',
+  smartDate('do petka oddaj poročilo'), dt(2026,5,15,9,0));
+
+// najkasneje do ponedeljka → Mon 18 May 09:00
+check('najkasneje do ponedeljka → Mon 18 May 09:00',
+  smartDate('najkasneje do ponedeljka oddaj naloge'), dt(2026,5,18,9,0));
+
+// last Friday of the month review report → last Fri of May = 29 May
+check('last Friday of the month review report → Fri 29 May 09:00',
+  smartDate('last Friday of the month review report'), dt(2026,5,29,9,0));
+checkStr('last Friday of the month title → "Review report"',
+  smartTitle('last Friday of the month review report'), 'Review report');
+
+// second Tuesday next month → 2nd Tue of June = 9 Jun
+check('second Tuesday next month → Tue 9 Jun 09:00',
+  smartDate('second Tuesday next month meeting'), dt(2026,6,9,9,0));
+
+// end of the week → Fri 15 May 17:00
+check('end of the week → Fri 15 May 17:00',
+  smartDate('end of the week submit tasks'), dt(2026,5,15,17,0));
+
+// by Friday → Fri 15 May 09:00
+check('by Friday → Fri 15 May 09:00',
+  smartDate('by Friday submit report'), dt(2026,5,15,9,0));
+
+// no later than Monday → Mon 18 May 09:00
+check('no later than Monday → Mon 18 May 09:00',
+  smartDate('no later than Monday submit tasks'), dt(2026,5,18,9,0));
 
 console.log('\n=== SLOVENIAN PHRASES ===\n');
 
-// 1. danes do 12h
-check('1. danes do 12h → today 12:00',
+check('danes do 12h → today 12:00',
   smartDate('danes do 12h'), dt(2026,5,11,12,0));
 
-// 2. danes ob 12:30
-check('2. danes ob 12:30 → today 12:30',
+check('danes ob 12:30 → today 12:30',
   smartDate('danes ob 12:30'), dt(2026,5,11,12,30));
 
-// 3. jutri ob 9
-check('3. jutri ob 9 → tomorrow 09:00',
+check('jutri ob 9 → tomorrow 09:00',
   smartDate('jutri ob 9'), dt(2026,5,12,9,0));
 
-// 4. jutri do 12h
-check('4. jutri do 12h → tomorrow 12:00',
+check('jutri do 12h → tomorrow 12:00',
   smartDate('jutri do 12h'), dt(2026,5,12,12,0));
 
-// 5. pojutrišnjem ob 10
-check('5. pojutrišnjem ob 10 → 13 May 09:00... wait, ob 10 → 10:00',
+check('pojutrišnjem ob 10 → 13 May 10:00',
   smartDate('pojutrišnjem ob 10'), dt(2026,5,13,10,0));
 
-// 6. čez 30 minut
-(function() {
-  const r = extractRelativeMinutes('čez 30 minut');
-  const expected = 30;
-  if (r === expected) { console.log('  PASS  6. čez 30 minut → 30'); pass++; }
-  else { console.log(`  FAIL  6. čez 30 minut → got ${r}, expected ${expected}`); fail++; }
-})();
+checkRelMins('čez 30 minut → 30', 'čez 30 minut', 30);
+checkRelMins('čez pol ure → 30', 'čez pol ure', 30);
+checkRelMins('čez 2 uri → 120', 'čez 2 uri', 120);
 
-// 7. čez pol ure
-checkRelMins('7. čez pol ure → 30', 'čez pol ure', 30);
-
-// 8. čez 2 uri
-checkRelMins('8. čez 2 uri → 120', 'čez 2 uri', 120);
-
-// 9. naslednji teden → next Monday 2026-05-18 09:00
-check('9. naslednji teden → Mon 18 May 09:00',
+check('naslednji teden → Mon 18 May 09:00',
   smartDate('naslednji teden'), dt(2026,5,18,9,0));
 
-// 10. naslednji ponedeljek (today IS Monday → next Monday = 18 May)
-check('10. naslednji ponedeljek → Mon 18 May 09:00',
+check('naslednji ponedeljek → Mon 18 May 09:00',
   smartDate('naslednji ponedeljek'), dt(2026,5,18,9,0));
 
-// 11. v petek ob 12h (next Friday = 15 May)
-check('11. v petek ob 12h → Fri 15 May 12:00',
+check('v petek ob 12h → Fri 15 May 12:00',
   smartDate('v petek ob 12h'), dt(2026,5,15,12,0));
 
-// 12. do konca tedna → Friday 15 May 17:00
-check('12. do konca tedna → Fri 15 May 17:00',
+check('do konca tedna → Fri 15 May 17:00',
   smartDate('do konca tedna'), dt(2026,5,15,17,0));
 
-// 13. do konca meseca → 31 May 17:00
-check('13. do konca meseca → 31 May 17:00',
+check('do konca meseca → 31 May 17:00',
   smartDate('do konca meseca'), dt(2026,5,31,17,0));
 
-// 14. 15.5.2026
-check('14. 15.5.2026 → 15 May 09:00',
+check('15.5.2026 → 15 May 09:00',
   smartDate('15.5.2026'), dt(2026,5,15,9,0));
 
-// 15. 15. maja 2026
-check('15. 15. maja 2026 → 15 May 09:00',
+check('15. maja 2026 → 15 May 09:00',
   smartDate('15. maja 2026'), dt(2026,5,15,9,0));
 
-// 16. Conference: 27.5.2026 event + prijava do 15.5.2026 → picks 27.5.2026
-check('16. conference 27.5.2026 + prijava do 15.5.2026 → 27 May 09:00',
+check('conference 27.5.2026 + prijava do 15.5.2026 → 27 May 09:00',
   smartDate('27.5.2026 organiziramo letno konferenco. Vabljeni k prijavi do 15.5.2026'),
   dt(2026,5,27,9,0));
 
-// 17. scanner example "pričakujem do danes do 12h"
-check('17. pričakujem do danes do 12h → today 12:00',
+check('pričakujem do danes do 12h → today 12:00',
   smartDate('Pozdravljeni, odgovor o skenerjih pričakujem do danes do 12h.'),
   dt(2026,5,11,12,0));
 
 console.log('\n=== ENGLISH PHRASES ===\n');
 
-// 18. today by 12
-check('18. today by 12 → today 12:00',
+check('today by 12 → today 12:00',
   smartDate('today by 12'), dt(2026,5,11,12,0));
 
-// 19. today at 12:30
-check('19. today at 12:30 → today 12:30',
+check('today at 12:30 → today 12:30',
   smartDate('today at 12:30'), dt(2026,5,11,12,30));
 
-// 20. tomorrow at 9
-check('20. tomorrow at 9 → tomorrow 09:00',
+check('tomorrow at 9 → tomorrow 09:00',
   smartDate('tomorrow at 9'), dt(2026,5,12,9,0));
 
-// 21. tomorrow by noon
-check('21. tomorrow by noon → tomorrow 12:00',
+check('tomorrow by noon → tomorrow 12:00',
   smartDate('tomorrow by noon'), dt(2026,5,12,12,0));
 
-// 22. in 30 minutes
-checkRelMins('22. in 30 minutes → 30', 'in 30 minutes', 30);
+checkRelMins('in 30 minutes → 30', 'in 30 minutes', 30);
+checkRelMins('in half an hour → 30', 'in half an hour', 30);
+checkRelMins('in 2 hours → 120', 'in 2 hours', 120);
 
-// 23. in half an hour
-checkRelMins('23. in half an hour → 30', 'in half an hour', 30);
-
-// 24. in 2 hours
-checkRelMins('24. in 2 hours → 120', 'in 2 hours', 120);
-
-// 25. next week → next Monday
-check('25. next week → Mon 18 May 09:00',
+check('next week → Mon 18 May 09:00',
   smartDate('next week'), dt(2026,5,18,9,0));
 
-// 26. next Monday at 10am (today IS Monday → next Monday = 18 May)
-check('26. next Monday at 10am → Mon 18 May 10:00',
+check('next Monday at 10am → Mon 18 May 10:00',
   smartDate('next Monday at 10am'), dt(2026,5,18,10,0));
 
-// 27. by Friday at 12 → Fri 15 May 12:00
-check('27. by Friday at 12 → Fri 15 May 12:00',
+check('by Friday at 12 → Fri 15 May 12:00',
   smartDate('by Friday at 12'), dt(2026,5,15,12,0));
 
-// 28. by end of week → Fri 15 May 17:00
-check('28. by end of week → Fri 15 May 17:00',
+check('by end of week → Fri 15 May 17:00',
   smartDate('by end of week'), dt(2026,5,15,17,0));
 
-// 29. by end of month → 31 May 17:00
-check('29. by end of month → 31 May 17:00',
+check('by end of month → 31 May 17:00',
   smartDate('by end of month'), dt(2026,5,31,17,0));
 
-// 30. May 15 2026
-check('30. May 15 2026 → 15 May 09:00',
+check('May 15 2026 → 15 May 09:00',
   smartDate('May 15 2026'), dt(2026,5,15,9,0));
 
-// 31. 15 May 2026
-check('31. 15 May 2026 → 15 May 09:00',
+check('15 May 2026 → 15 May 09:00',
   smartDate('15 May 2026'), dt(2026,5,15,9,0));
 
-// 32. scanner English: "Please send the scanner order report by Friday at 12"
-check('32. by Friday at 12 (English) → Fri 15 May 12:00',
+check('by Friday at 12 (English scanner) → Fri 15 May 12:00',
   smartDate('Please send the scanner order report by Friday at 12'),
   dt(2026,5,15,12,0));
 
-console.log('\n=== MANUAL MODE QUICK BUTTONS ===\n');
+console.log('\n=== QUICK BUTTONS ===\n');
 
-// 33. Danes ob 12
-check('33. quickTodayNoon → today 12:00', quickTodayNoon(), dt(2026,5,11,12,0));
+check('quickTodayNoon → today 12:00', quickTodayNoon(), dt(2026,5,11,12,0));
+check('quick1h → today 10:00', quick1h(), dt(2026,5,11,10,0));
+check('quickTomorrow9 → tomorrow 09:00', quickTomorrow9(), dt(2026,5,12,9,0));
+check('quick3d → 14 May 09:00', quick3d(), dt(2026,5,14,9,0));
+check('quickNextWeek → Mon 18 May 09:00', quickNextWeek(), dt(2026,5,18,9,0));
 
-// 34. Čez 1 uro (now is 09:00 → 10:00)
-check('34. quick1h → today 10:00', quick1h(), dt(2026,5,11,10,0));
+console.log('\n=== MISC ===\n');
 
-// 35. Jutri ob 9
-check('35. quickTomorrow9 → tomorrow 09:00', quickTomorrow9(), dt(2026,5,12,9,0));
-
-// 36. Čez 3 dni
-check('36. quick3d → 14 May 09:00', quick3d(), dt(2026,5,14,9,0));
-
-// 37. Naslednji teden → next Monday
-check('37. quickNextWeek → Mon 18 May 09:00', quickNextWeek(), dt(2026,5,18,9,0));
-
-// 38. Validation: past date detection
 (function() {
   const pastDate = new Date(2020, 0, 1);
   const isPast = pastDate < new Date();
-  if (isPast) { console.log('  PASS  38. past date detected as past'); pass++; }
-  else        { console.log('  FAIL  38. past date should be detected as past'); fail++; }
+  if (isPast) { console.log('  PASS  past date detected as past'); pass++; }
+  else        { console.log('  FAIL  past date should be detected as past'); fail++; }
 })();
 
-// 39-40 — email validation (regex based, no DOM)
 (function() {
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const emptyOk = !EMAIL_RE.test('');
-  if (emptyOk) { console.log('  PASS  39. empty email invalid'); pass++; }
-  else { console.log('  FAIL  39. empty email should be invalid'); fail++; }
+  if (emptyOk) { console.log('  PASS  empty email invalid'); pass++; }
+  else { console.log('  FAIL  empty email should be invalid'); fail++; }
   const badOk = !EMAIL_RE.test('notanemail');
-  if (badOk) { console.log('  PASS  40. invalid email rejected'); pass++; }
-  else { console.log('  FAIL  40. invalid email should be rejected'); fail++; }
+  if (badOk) { console.log('  PASS  invalid email rejected'); pass++; }
+  else { console.log('  FAIL  invalid email should be rejected'); fail++; }
 })();
 
-console.log('\n=== ADDITIONAL COVERAGE ===\n');
-
-// 41. čez dve uri
-checkRelMins('41. čez dve uri → 120', 'čez dve uri', 120);
-
-// 42. in one hour
-checkRelMins('42. in one hour → 60', 'in one hour', 60);
-
-// 43. do konca dneva → today 17:00
-check('43. do konca dneva → today 17:00',
-  smartDate('do konca dneva'), dt(2026,5,11,17,0));
-
-// 44. prihodnji teden → next Monday
-check('44. prihodnji teden → Mon 18 May 09:00',
-  smartDate('prihodnji teden'), dt(2026,5,18,9,0));
-
-// 45. ob poldne → 12:00
-checkTime('45. ob poldne → 12:00', 'ob poldne', 12, 0);
+checkRelMins('čez dve uri → 120', 'čez dve uri', 120);
+checkRelMins('in one hour → 60', 'in one hour', 60);
+check('do konca dneva → today 17:00', smartDate('do konca dneva'), dt(2026,5,11,17,0));
+check('prihodnji teden → Mon 18 May 09:00', smartDate('prihodnji teden'), dt(2026,5,18,9,0));
+checkTime('ob poldne → 12:00', 'ob poldne', 12, 0);
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 
-console.log(`\n${'─'.repeat(50)}`);
+console.log(`\n${'─'.repeat(60)}`);
 console.log(`Results: ${pass} PASS, ${fail} FAIL out of ${pass + fail} tests`);
 if (fail === 0) console.log('All tests passed!');
 else console.log(`${fail} test(s) failed.`);
