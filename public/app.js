@@ -664,6 +664,11 @@ function stripDeadlineTail(text) {
     .replace(/\s*\bwithin\s+\d+\s+days?\b.*$/i, '')
     .replace(/\s*\bčim prej\b.*$/i, '')
     .replace(/\s*,?\s*(?:čim prej|takoj|asap|urgentno|nujno)\s*$/i, '')
+    // SL payment-date tails (e.g. "Plačajo do 22.5.2026", "Plačilo do 22.5.")
+    .replace(/\s*\b(?:plačaj[oe]|plačil[oa]|plačan[oa]?|plačati|poravna(?:jo|no)|bo\s+plačan[oa]?)\s+do\s+[\d][\d./\-]*.*$/gi, '')
+    // EN payment-date tails (e.g. "payment will be made by 22.5.2026", "due by 22.5.")
+    .replace(/\s*\b(?:pay(?:ment)?(?:\s+will\s+be\s+made)?|paid)\s+by\s+[\d][\d./\-]*.*$/gi, '')
+    .replace(/\s*\bdue\s+by\s+[\d][\d./\-]*.*$/gi, '')
     .replace(/\s*[,.]$/, '')
     .trim();
 }
@@ -683,6 +688,19 @@ function extractPriorityDate(text) {
   if (found.length < 2) return null;
   const eventDate = found.find(f => !f.isDeadline);
   return eventDate ? eventDate.date : null;
+}
+
+// When text has a payment/collection phrase followed by an explicit date, return that date.
+// Handles notes like "12.5.2026 Klic z Anito. Plačajo do 22.5.2026" — the first date is a
+// context/note date; the real reminder deadline is the one after the payment phrase.
+function extractPaymentDeadlineDate(text) {
+  const PAYMENT_RE = /(?:plačaj[oe]\s+do|plačil[oa]\s+do|plačan[oa]?\s+do|bo\s+plačan[oa]?\s+do|plačati\s+do|poravna(?:jo|no)\s+do|rok\s+plačila\s+do|pay\s+by|payment\s+(?:will\s+be\s+made\s+)?by|paid\s+by|due\s+by)\s+(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/gi;
+  let m;
+  while ((m = PAYMENT_RE.exec(text)) !== null) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
 }
 
 // Strip date/time phrases for short single-line title extraction
@@ -759,6 +777,8 @@ function extractTitle(text, businessContext) {
   // For short single-line inputs, strip date/time and business boilerplate to get the core noun
   if (lines.length === 1) {
     let stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    // Strip leading context/note date (e.g. "12.5.2026 Klic z Anito. Plačajo do 22.5.")
+    stripped = stripped.replace(/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\s+/, '');
     stripped = stripped.replace(BUSINESS_FILLER_RE, '').trim();
     stripped = stripDeadlineTail(stripped);
     // Short action-verb result + "regarding X" in original → use X as subject
@@ -848,12 +868,18 @@ function parseSmartReminderText(text, offset) {
   const multiDate  = countDateSignals(text) >= 2;
   const urgent     = detectUrgency(text);
 
-  // When multiple explicit dates exist, prefer the event date over a deadline date
-  const priorityDate = extractPriorityDate(text);
-  if (priorityDate) {
-    rawDate = priorityDate;
-    // Keep tier as 'exact' since it's an explicit date
+  // Payment/collection note: prefer the date that follows a payment phrase over any context date
+  const paymentDate = extractPaymentDeadlineDate(text);
+  if (paymentDate) {
+    rawDate = paymentDate;
     tier = 'exact';
+  } else {
+    // When multiple explicit dates exist, prefer the event date over a registration/application deadline
+    const priorityDate = extractPriorityDate(text);
+    if (priorityDate) {
+      rawDate = priorityDate;
+      tier = 'exact';
+    }
   }
 
   if (!rawDate) {

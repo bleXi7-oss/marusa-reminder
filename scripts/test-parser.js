@@ -449,6 +449,11 @@ function stripDeadlineTail(text) {
     .replace(/\s*\bwithin\s+\d+\s+days?\b.*$/i, '')
     .replace(/\s*\bčim prej\b.*$/i, '')
     .replace(/\s*,?\s*(?:čim prej|takoj|asap|urgentno|nujno)\s*$/i, '')
+    // SL payment-date tails (e.g. "Plačajo do 22.5.2026", "Plačilo do 22.5.")
+    .replace(/\s*\b(?:plačaj[oe]|plačil[oa]|plačan[oa]?|plačati|poravna(?:jo|no)|bo\s+plačan[oa]?)\s+do\s+[\d][\d./\-]*.*$/gi, '')
+    // EN payment-date tails (e.g. "payment will be made by 22.5.2026", "due by 22.5.")
+    .replace(/\s*\b(?:pay(?:ment)?(?:\s+will\s+be\s+made)?|paid)\s+by\s+[\d][\d./\-]*.*$/gi, '')
+    .replace(/\s*\bdue\s+by\s+[\d][\d./\-]*.*$/gi, '')
     .replace(/\s*[,.]$/, '')
     .trim();
 }
@@ -467,6 +472,16 @@ function extractPriorityDate(text) {
   if (found.length < 2) return null;
   const eventDate = found.find(f => !f.isDeadline);
   return eventDate ? eventDate.date : null;
+}
+
+function extractPaymentDeadlineDate(text) {
+  const PAYMENT_RE = /(?:plačaj[oe]\s+do|plačil[oa]\s+do|plačan[oa]?\s+do|bo\s+plačan[oa]?\s+do|plačati\s+do|poravna(?:jo|no)\s+do|rok\s+plačila\s+do|pay\s+by|payment\s+(?:will\s+be\s+made\s+)?by|paid\s+by|due\s+by)\s+(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/gi;
+  let m;
+  while ((m = PAYMENT_RE.exec(text)) !== null) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
 }
 
 function stripDateTimePhrases(text) {
@@ -534,6 +549,8 @@ function extractTitle(text, businessContext) {
 
   if (lines.length === 1) {
     let stripped = stripDateTimePhrases(lines[0]).replace(GREETING_RE, '').trim();
+    // Strip leading context/note date (e.g. "12.5.2026 Klic z Anito. Plačajo do 22.5.")
+    stripped = stripped.replace(/^\d{1,2}[.\/-]\d{1,2}[.\/-]\d{4}\s+/, '');
     stripped = stripped.replace(BUSINESS_FILLER_RE, '').trim();
     stripped = stripDeadlineTail(stripped);
     if (stripped.length < 8 && /^(?:reply|respond|answer|submit|check)\s*$/i.test(stripped)) {
@@ -608,10 +625,16 @@ function parseSmartReminderText(text, offset) {
   const multiDate  = countDateSignals(text) >= 2;
   const urgent     = detectUrgency(text);
 
-  const priorityDate = extractPriorityDate(text);
-  if (priorityDate) {
-    rawDate = priorityDate;
+  const paymentDate = extractPaymentDeadlineDate(text);
+  if (paymentDate) {
+    rawDate = paymentDate;
     tier = 'exact';
+  } else {
+    const priorityDate = extractPriorityDate(text);
+    if (priorityDate) {
+      rawDate = priorityDate;
+      tier = 'exact';
+    }
   }
 
   if (!rawDate) {
@@ -934,6 +957,44 @@ checkRelMins('in one hour → 60', 'in one hour', 60);
 check('do konca dneva → today 17:00', smartDate('do konca dneva'), dt(2026,5,11,17,0));
 check('prihodnji teden → Mon 18 May 09:00', smartDate('prihodnji teden'), dt(2026,5,18,9,0));
 checkTime('ob poldne → 12:00', 'ob poldne', 12, 0);
+
+console.log('\n=== COLLECTION / PAYMENT NOTES ===\n');
+
+// COLL1: SL collection note — first date is context date, deadline comes after payment phrase
+check('COLL1 date: SL two-date note (plačajo do) → 22 May 09:00',
+  smartDate('12.5.2026 Govorim z Anito ker računovodkinje ni. Plačajo do 22.5.2026'),
+  dt(2026,5,22,9,0));
+checkStr('COLL1 title: leading context date removed',
+  smartTitle('12.5.2026 Govorim z Anito ker računovodkinje ni. Plačajo do 22.5.2026'),
+  'Govorim z Anito ker računovodkinje ni');
+
+// COLL2: EN two-date payment note
+check('COLL2 date: EN two-date note (payment will be made by) → 22 May 09:00',
+  smartDate('12.5.2026 Called accounting. Payment will be made by 22.5.2026'),
+  dt(2026,5,22,9,0));
+
+// COLL3: Single-date SL — "Račun bo plačan do"
+check('COLL3 date: Račun bo plačan do 22.5.2026 → 22 May 09:00',
+  smartDate('Račun bo plačan do 22.5.2026'),
+  dt(2026,5,22,9,0));
+checkStr('COLL3 title: "Račun"',
+  smartTitle('Račun bo plačan do 22.5.2026'),
+  'Račun');
+
+// COLL4: Single-date EN — "Please pay by"
+check('COLL4 date: Please pay by 22.5.2026 → 22 May 09:00',
+  smartDate('Please pay by 22.5.2026'),
+  dt(2026,5,22,9,0));
+
+// COLL5: Multiple dates — payment deadline must win over context date
+check('COLL5 date: plačilo do — deadline wins → 22 May 09:00',
+  smartDate('12.5.2026 Klic z računovodjo. Plačilo do 22.5.2026.'),
+  dt(2026,5,22,9,0));
+
+// COLL6 regression: conference + prijava do → event date still wins (existing behaviour)
+check('COLL6 regression: conference + prijava do → event date 27 May 09:00',
+  smartDate('27.5.2026 organiziramo letno konferenco. Vabljeni k prijavi do 15.5.2026'),
+  dt(2026,5,27,9,0));
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 
