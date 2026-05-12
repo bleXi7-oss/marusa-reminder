@@ -484,6 +484,17 @@ function extractPaymentDeadlineDate(text) {
   return null;
 }
 
+function extractAllExplicitDates(text) {
+  const found = [];
+  const re = /(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (!isNaN(d.getTime())) found.push(d);
+  }
+  return found;
+}
+
 function stripDateTimePhrases(text) {
   return text
     .replace(/\bob\s+\d{1,2}(?:[.:]\d{2})?h?\b/gi, '')
@@ -637,9 +648,18 @@ function parseSmartReminderText(text, offset) {
     }
   }
 
+  const alternativeDates = rawDate
+    ? extractAllExplicitDates(text).filter(d =>
+        d.getFullYear() !== rawDate.getFullYear() ||
+        d.getMonth()    !== rawDate.getMonth()    ||
+        d.getDate()     !== rawDate.getDate()
+      ).filter((d, i, arr) => arr.findIndex(x => x.getTime() === d.getTime()) === i)
+    : [];
+
   if (!rawDate) {
     return {
-      title, eventDate: null, remindAt: null, description, confidence: 'none', confidenceReason: 'Datum ni bil zaznan.', businessContext,
+      title, eventDate: null, remindAt: null, description, confidence: 'none',
+      confidenceReason: 'Datum ni bil zaznan.', businessContext, alternativeDates: [],
       warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
     };
   }
@@ -666,14 +686,15 @@ function parseSmartReminderText(text, offset) {
     confidence = 'low'; confidenceReason = 'Datum je ohlapno določen, preveri.';
   }
 
-  const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
-  if (multiDate) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
+  const warning = (multiDate && alternativeDates.length === 0)
+    ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.'
+    : null;
+  if (multiDate && alternativeDates.length === 0) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
 
   return {
-    title,
-    eventDate,
+    title, eventDate,
     remindAt: applyReminderOffset(new Date(eventDate), offset || '0'),
-    description, confidence, confidenceReason, warning, businessContext,
+    description, confidence, confidenceReason, warning, businessContext, alternativeDates,
   };
 }
 
@@ -741,6 +762,20 @@ function smartDate(text) {
 
 function smartTitle(text) {
   return parseSmartReminderText(text, '0').title;
+}
+
+function smartAltDates(text) {
+  return parseSmartReminderText(text, '0').alternativeDates || [];
+}
+
+function checkNum(label, actual, expected) {
+  if (actual === expected) {
+    console.log(`  PASS  ${label}`);
+    pass++;
+  } else {
+    console.log(`  FAIL  ${label} — got ${actual}, expected ${expected}`);
+    fail++;
+  }
 }
 
 // NOW = Monday 2026-05-11 09:00
@@ -995,6 +1030,33 @@ check('COLL5 date: plačilo do — deadline wins → 22 May 09:00',
 check('COLL6 regression: conference + prijava do → event date 27 May 09:00',
   smartDate('27.5.2026 organiziramo letno konferenco. Vabljeni k prijavi do 15.5.2026'),
   dt(2026,5,27,9,0));
+
+console.log('\n=== ALTERNATIVE DATE CHIPS ===\n');
+
+// ALT1: SL two-date payment note → selected=22 May, alt=[12 May]
+{
+  const alts = smartAltDates('12.5.2026 Govorim z Anito. Plačajo do 22.5.2026');
+  checkNum('ALT1: alternativeDates length = 1', alts.length, 1);
+  check('ALT1: alt date is 12 May 2026', alts[0], dt(2026,5,12,0,0));
+}
+
+// ALT2: EN two-date payment note → selected=22 May, alt=[12 May]
+{
+  const alts = smartAltDates('12.5.2026 Called accounting. Payment will be made by 22.5.2026');
+  checkNum('ALT2: alternativeDates length = 1', alts.length, 1);
+  check('ALT2: alt date is 12 May 2026', alts[0], dt(2026,5,12,0,0));
+}
+
+// ALT3: single-date text → no alternatives
+checkNum('ALT3: single date → alternativeDates empty',
+  smartAltDates('Račun bo plačan do 22.5.2026').length, 0);
+
+// ALT4: conference+prijava regression → selected=27 May, alt=[15 May]
+{
+  const alts = smartAltDates('27.5.2026 organiziramo letno konferenco. Vabljeni k prijavi do 15.5.2026');
+  checkNum('ALT4: conference+prijava → 1 alt', alts.length, 1);
+  check('ALT4: alt date is 15 May 2026', alts[0], dt(2026,5,15,0,0));
+}
 
 // ── Summary ──────────────────────────────────────────────────────────────────
 

@@ -443,6 +443,46 @@ input[type="checkbox"] {
 .preview-btns .btn-primary  { flex: 1; min-width: 130px; }
 .preview-btns .btn-secondary { padding: 13px 16px; font-size: 0.9rem; }
 
+/* ── Alternative date chips ─────────────────────────────────── */
+.preview-alt-dates {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #b8ddc8;
+}
+
+.preview-alt-note {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.preview-alt-note strong { color: var(--text); }
+
+.preview-alt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.btn-alt-date {
+  font-size: 0.79rem;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn-alt-date:hover {
+  background: var(--accent-lt);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+[data-theme="night"] .preview-alt-dates { border-top-color: #2d5040; }
+
 /* Locked fields in preview mode */
 .preview-mode .field input:not([type="checkbox"]),
 .preview-mode .field textarea {

@@ -703,6 +703,17 @@ function extractPaymentDeadlineDate(text) {
   return null;
 }
 
+function extractAllExplicitDates(text) {
+  const found = [];
+  const re = /(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const d = new Date(+m[3], +m[2]-1, +m[1]);
+    if (!isNaN(d.getTime())) found.push(d);
+  }
+  return found;
+}
+
 // Strip date/time phrases for short single-line title extraction
 function stripDateTimePhrases(text) {
   return text
@@ -860,7 +871,7 @@ function parseSmartReminderText(text, offset) {
     const now = new Date();
     now.setSeconds(0, 0);
     now.setMinutes(now.getMinutes() + relMins);
-    return { title, eventDate: now, remindAt: now, description, confidence: 'high', confidenceReason: 'Zaznano relativno besedilo z jasnim časom.', warning: null, businessContext };
+    return { title, eventDate: now, remindAt: now, description, confidence: 'high', confidenceReason: 'Zaznano relativno besedilo z jasnim časom.', warning: null, businessContext, alternativeDates: [] };
   }
 
   let { date: rawDate, tier } = extractDate(text);
@@ -882,9 +893,19 @@ function parseSmartReminderText(text, offset) {
     }
   }
 
+  // Alternative dates: other explicit D.M.YYYY dates that weren't selected
+  const alternativeDates = rawDate
+    ? extractAllExplicitDates(text).filter(d =>
+        d.getFullYear() !== rawDate.getFullYear() ||
+        d.getMonth()    !== rawDate.getMonth()    ||
+        d.getDate()     !== rawDate.getDate()
+      ).filter((d, i, arr) => arr.findIndex(x => x.getTime() === d.getTime()) === i)
+    : [];
+
   if (!rawDate) {
     return {
-      title, eventDate: null, remindAt: null, description, confidence: 'none', confidenceReason: 'Datum ni bil zaznan.', businessContext,
+      title, eventDate: null, remindAt: null, description, confidence: 'none',
+      confidenceReason: 'Datum ni bil zaznan.', businessContext, alternativeDates: [],
       warning: urgent ? 'Videti je nujno, ampak datuma nisem našla. Izberi datum ročno.' : null,
     };
   }
@@ -911,14 +932,16 @@ function parseSmartReminderText(text, offset) {
     confidence = 'low'; confidenceReason = 'Datum je ohlapno določen, preveri.';
   }
 
-  const warning = multiDate ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.' : null;
-  if (multiDate) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
+  // Show warning only for ambiguous multi-date cases where no chip is offered
+  const warning = (multiDate && alternativeDates.length === 0)
+    ? 'Našla sem več možnih datumov. Preveri, če je izbran pravi.'
+    : null;
+  if (multiDate && alternativeDates.length === 0) confidenceReason = 'Najdenih je več datumov, preveri izbiro.';
 
   return {
-    title,
-    eventDate,
+    title, eventDate,
     remindAt: applyReminderOffset(new Date(eventDate), offset),
-    description, confidence, confidenceReason, warning, businessContext,
+    description, confidence, confidenceReason, warning, businessContext, alternativeDates,
   };
 }
 
@@ -1447,7 +1470,7 @@ document.getElementById('testEmailBtn').addEventListener('click', async () => {
 
 // ── Preview Mode ──────────────────────────────────────────────
 
-function enterPreviewMode(eventDate, remindAt) {
+function enterPreviewMode(eventDate, remindAt, alternativeDates) {
   const manualSection = document.getElementById('manualSection');
   manualSection.classList.add('preview-mode');
 
@@ -1460,6 +1483,38 @@ function enterPreviewMode(eventDate, remindAt) {
   document.getElementById('previewEvent').textContent    = eventDate ? eventDate.toLocaleString('sl-SI', fmtOpts) : '—';
   document.getElementById('previewReminder').textContent = remindAt  ? remindAt.toLocaleString('sl-SI', fmtOpts) : '—';
 
+  // Alternative date chips
+  const altSection = document.getElementById('previewAltDates');
+  const altChips   = document.getElementById('previewAltChips');
+  altChips.innerHTML = '';
+  if (alternativeDates && alternativeDates.length > 0) {
+    document.getElementById('previewAltSelected').textContent =
+      `${eventDate.getDate()}. ${eventDate.getMonth() + 1}. ${eventDate.getFullYear()}`;
+    const offsetMs = eventDate.getTime() - remindAt.getTime();
+    alternativeDates.forEach(altDate => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-alt-date';
+      btn.textContent = `Uporabi ${altDate.getDate()}. ${altDate.getMonth() + 1}. ${altDate.getFullYear()}`;
+      btn.addEventListener('click', () => {
+        const newEvent = new Date(altDate);
+        newEvent.setHours(eventDate.getHours(), eventDate.getMinutes(), 0, 0);
+        const newRemind = new Date(newEvent.getTime() - offsetMs);
+        lastParsedEventDate = newEvent;
+        setRemindAt(newRemind);
+        document.getElementById('previewEvent').textContent    = newEvent.toLocaleString('sl-SI', fmtOpts);
+        document.getElementById('previewReminder').textContent = newRemind.toLocaleString('sl-SI', fmtOpts);
+        altSection.classList.add('hidden');
+        updateTimingPreview();
+        updateFollowUpPreview();
+      });
+      altChips.appendChild(btn);
+    });
+    altSection.classList.remove('hidden');
+  } else {
+    altSection.classList.add('hidden');
+  }
+
   document.getElementById('previewBlock').classList.remove('hidden');
   document.getElementById('normalActions').classList.add('hidden');
   document.getElementById('manualHint').classList.add('hidden');
@@ -1471,6 +1526,7 @@ function exitPreviewMode() {
 
   manualSection.classList.remove('preview-mode');
   document.getElementById('previewBlock').classList.add('hidden');
+  document.getElementById('previewAltDates').classList.add('hidden');
   document.getElementById('normalActions').classList.remove('hidden');
   document.getElementById('manualHint').classList.remove('hidden');
 }
@@ -1569,7 +1625,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     result = parseSmartReminderText(text, document.getElementById('smartOffset').value);
   }
 
-  const { title, eventDate, remindAt, description, confidence, confidenceReason, warning } = result;
+  const { title, eventDate, remindAt, description, confidence, confidenceReason, warning, alternativeDates } = result;
 
   document.getElementById('title').value       = title;
   document.getElementById('description').value = description;
@@ -1583,7 +1639,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
     const isPast = remindAt < new Date();
     if (isPast) {
       showMessage(msg, 'Opomnik bi bil poslan v preteklosti. Izberi manjši zamik ali kasnejši čas.', 'error');
-    } else if (warning) {
+    } else if (warning && !(alternativeDates && alternativeDates.length > 0)) {
       showMessage(msg, warning, 'error');
     } else {
       showMessage(msg, 'Opomnik pripravljen 👌', 'success');
@@ -1591,7 +1647,7 @@ document.getElementById('smartBtn').addEventListener('click', () => {
 
     showExtractedContacts(extractContacts(text));
     revealManualForm();
-    if (!isPast) enterPreviewMode(eventDate, remindAt);
+    if (!isPast) enterPreviewMode(eventDate, remindAt, alternativeDates || []);
     lastParsedEventDate = new Date(eventDate);
     updateDetectCard(eventDate, remindAt);
     updateConfidenceIndicator(confidence, confidenceReason);
