@@ -2095,6 +2095,102 @@ document.getElementById('resetAllBtn').addEventListener('click', () => {
   setTimeout(() => { btn.textContent = orig; }, 2200);
 });
 
+// ── Backup & Import ───────────────────────────────────────────
+
+document.getElementById('backupDownloadBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('backupDownloadBtn');
+  const msg = document.getElementById('backupMsg');
+  btn.disabled = true;
+  btn.textContent = 'Prenašam…';
+  try {
+    const res = await apiFetch('/api/reminders/export');
+    if (res.status === 401) { handleUnauthorized(); return; }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'reminders-backup.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showMessage(msg, 'Backup uspešno prenesen.', 'success');
+  } catch (err) {
+    showMessage(msg, 'Napaka pri prenosu backupa. Poskusi znova.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇ Prenesi backup opomnikov';
+  }
+});
+
+document.getElementById('backupFileInput').addEventListener('change', function () {
+  const nameEl = document.getElementById('backupFileName');
+  const importBtn = document.getElementById('backupImportBtn');
+  if (this.files && this.files[0]) {
+    nameEl.textContent = this.files[0].name;
+    importBtn.disabled = false;
+  } else {
+    nameEl.textContent = 'Izberi datoteko…';
+    importBtn.disabled = true;
+  }
+});
+
+document.getElementById('backupImportBtn').addEventListener('click', async () => {
+  const fileInput = document.getElementById('backupFileInput');
+  const btn       = document.getElementById('backupImportBtn');
+  const msg       = document.getElementById('backupMsg');
+
+  if (!fileInput.files || !fileInput.files[0]) return;
+
+  let parsed;
+  try {
+    const text = await fileInput.files[0].text();
+    parsed = JSON.parse(text);
+  } catch {
+    showMessage(msg, 'Datoteka ni veljavna JSON. Uvoz ni mogoč.', 'error');
+    return;
+  }
+
+  if (!Array.isArray(parsed)) {
+    showMessage(msg, 'Datoteka ni seznam opomnikov. Uvoz ni mogoč.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Uvažam…';
+
+  try {
+    const res  = await apiFetch('/api/reminders/import', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(parsed),
+    });
+    if (res.status === 401) { handleUnauthorized(); return; }
+    const data = await res.json();
+    if (!res.ok) {
+      showMessage(msg, apiErrorDisplay(data), 'error');
+      return;
+    }
+    showMessage(
+      msg,
+      `Uvoz uspešen: ${data.imported} novih, ${data.skipped} preskočenih. Skupaj: ${data.total} opomnikov.`,
+      'success'
+    );
+    // Reset file input
+    fileInput.value = '';
+    document.getElementById('backupFileName').textContent = 'Izberi datoteko…';
+    btn.disabled = true;
+    // Refresh reminder list
+    await loadReminders();
+  } catch {
+    showMessage(msg, 'Napaka pri uvozu. Poskusi znova.', 'error');
+  } finally {
+    btn.disabled = !fileInput.files || !fileInput.files[0];
+    btn.textContent = '⬆ Uvozi backup';
+  }
+});
+
 // ── Theme ─────────────────────────────────────────────────────
 
 const THEME_KEY        = 'marusa_theme';

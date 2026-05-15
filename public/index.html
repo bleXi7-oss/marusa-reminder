@@ -616,7 +616,33 @@
           </div>
         </div>
 
-        <!-- 13: Za g33ke -->
+        <!-- 13: Varnostna kopija -->
+        <div class="help-section" data-keywords="backup varnostna kopija izvoz uvoz import export restore obnovitev json prenesi datoteka">
+          <button class="help-section-btn" aria-expanded="false">
+            <span class="help-section-icon">💾</span>
+            <span class="help-section-title">Varnostna kopija & obnova</span>
+            <span class="help-section-chevron">▾</span>
+          </button>
+          <div class="help-section-body" hidden>
+            <p>Prenesi vse opomnike kot JSON datoteko ali jih obnovi iz shranjene kopije.</p>
+            <p class="help-tip">💡 Priporočamo: prenesi backup pred selitvijo na drug strežnik ali pred brisanjem podatkov.</p>
+            <div class="backup-section">
+              <div class="backup-row">
+                <button id="backupDownloadBtn" class="btn-secondary help-test-btn">⬇ Prenesi backup opomnikov</button>
+              </div>
+              <div class="backup-row backup-import-row">
+                <label class="backup-file-label" for="backupFileInput">
+                  <input type="file" id="backupFileInput" accept=".json" class="backup-file-input" />
+                  <span id="backupFileName" class="backup-file-name">Izberi datoteko…</span>
+                </label>
+                <button id="backupImportBtn" class="btn-secondary help-test-btn" disabled>⬆ Uvozi backup</button>
+              </div>
+              <div id="backupMsg" class="message hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 14: Za g33ke -->
         <div class="help-section" data-keywords="geek tehnika frontend backend node express json localstorage parser regex resend api koda arhitektura varnost zasebnost podatki">
           <button class="help-section-btn" aria-expanded="false">
             <span class="help-section-icon">🔩</span>

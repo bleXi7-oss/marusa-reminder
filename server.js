@@ -597,6 +597,84 @@ app.get('/api/reminders/export', requireAuth, async (req, res) => {
   }
 });
 
+// Protected: import a JSON backup — merge by id, never wipe existing data
+app.post('/api/reminders/import', requireAuth, async (req, res) => {
+  const data = req.body;
+
+  if (!Array.isArray(data)) {
+    return res.status(400).json(makeError('ERR-007', {
+      message: 'Backup mora biti JSON polje (array).',
+      action:  'Uvozi samo datoteke, ki jih je Maruša izvozila.',
+    }));
+  }
+
+  for (let i = 0; i < data.length; i++) {
+    const r = data[i];
+    if (!r || typeof r !== 'object' || !r.id || !r.title || !r.remindAt) {
+      return res.status(400).json(makeError('ERR-007', {
+        message: `Neveljavna vrstica #${i + 1}: manjka id, title ali remindAt.`,
+        action:  'Uvozi samo datoteke, ki jih je Maruša izvozila.',
+      }));
+    }
+  }
+
+  let existing;
+  try {
+    existing = await loadReminders();
+  } catch (err) {
+    console.error('[Import] Napaka nalaganja:', err.message);
+    return res.status(500).json(makeError('ERR-015'));
+  }
+
+  const now         = Date.now();
+  const existingMap = new Map(existing.map(r => [r.id, r]));
+  let   imported    = 0;
+  let   skipped     = 0;
+
+  for (const incoming of data) {
+    const current = existingMap.get(incoming.id);
+
+    if (!current) {
+      // New reminder — guard against spurious email sends for past-due unsent items
+      const safe = { ...incoming };
+      if (!safe.sent && new Date(safe.remindAt).getTime() <= now) {
+        safe.sent   = true;
+        safe.sentAt = safe.sentAt || new Date().toISOString();
+      }
+      existingMap.set(safe.id, safe);
+      imported++;
+    } else {
+      // Duplicate — replace only when incoming has a strictly newer updatedAt
+      const incomingTs = incoming.updatedAt ? new Date(incoming.updatedAt).getTime() : 0;
+      const currentTs  = current.updatedAt  ? new Date(current.updatedAt).getTime()  : 0;
+
+      if (incoming.updatedAt && incomingTs > currentTs) {
+        const safe = { ...incoming };
+        if (!safe.sent && new Date(safe.remindAt).getTime() <= now) {
+          safe.sent   = true;
+          safe.sentAt = safe.sentAt || new Date().toISOString();
+        }
+        existingMap.set(safe.id, safe);
+        imported++;
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  const merged = Array.from(existingMap.values());
+
+  try {
+    await saveReminders(merged);
+  } catch (err) {
+    console.error('[Import] Napaka shranjevanja:', err.message);
+    return res.status(500).json(makeError('ERR-007'));
+  }
+
+  console.log(`[Import] imported=${imported} skipped=${skipped} total=${merged.length}`);
+  res.json({ ok: true, imported, skipped, total: merged.length });
+});
+
 // ── Start ─────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
