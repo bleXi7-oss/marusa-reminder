@@ -351,3 +351,121 @@ Pred vsakim commitom preveri: `git status`
 ---
 
 Narejen z ❤️ za osebno uporabo.
+
+---
+
+## Supabase — trajna hramba opomnikov
+
+### Zakaj Supabase?
+
+Render Free ima **začasni (ephemeral) datotečni sistem**. Ob vsakem redeploy ali zamenjavi kontejnerja se datoteka `data/reminders.json` popolnoma zbriše. Opomnik, nastavljen za čez 3 dni, lahko izgine, preden se pošlje.
+
+Supabase Free reši ta problem: opomniki so shranjeni v PostgreSQL bazi, ki preživi vsak redeploy.
+
+### Ustvari Supabase projekt
+
+1. Registriraj se na [supabase.com](https://supabase.com) (brezplačno)
+2. Klikni **New project** — izberi ime, regijo in geslo za bazo
+3. Počakaj ~1 minuto, da se projekt ustvari
+
+### Ustvari tabelo za opomnike
+
+V Supabase dashboard odpri **SQL Editor** in zaženi:
+
+```sql
+create table if not exists reminders (
+  id text primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+create or replace function set_updated_at()
+returns trigger as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists reminders_set_updated_at on reminders;
+
+create trigger reminders_set_updated_at
+before update on reminders
+for each row
+execute function set_updated_at();
+```
+
+### Pridobi ključe
+
+V Supabase dashboard odpri **Project Settings → API**:
+
+- `Project URL` → vrednost za `SUPABASE_URL`
+- `service_role` ključ (pod **Project API keys**) → vrednost za `SUPABASE_SERVICE_ROLE_KEY`
+- `anon` ključ → vrednost za GitHub Actions secret `SUPABASE_ANON_KEY`
+
+> **Varnost:** `service_role` ključ ima popoln dostop do baze — nikoli ga ne izpostavi frontendu ali GitHub Actions. Supabase logika teče samo na strežniku.
+
+### Okoljske spremenljivke na Render
+
+Dodaj v Render → Environment Variables:
+
+| Spremenljivka | Vrednost |
+|---|---|
+| `PERSISTENCE_DRIVER` | `supabase` |
+| `SUPABASE_URL` | `https://xxxx.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJ...` (service_role ključ) |
+
+Obstoječe spremenljivke (`RESEND_API_KEY`, `MAIL_FROM`, `APP_ACCESS_CODE` itd.) ostanejo nespremenjene.
+
+### GitHub Actions secrets (za heartbeat)
+
+V GitHub → Settings → Secrets and variables → Actions dodaj:
+
+| Secret | Vrednost |
+|---|---|
+| `SUPABASE_URL` | `https://xxxx.supabase.co` |
+| `SUPABASE_ANON_KEY` | `eyJ...` (anon ključ, **ne** service_role) |
+
+Heartbeat workflow (`.github/workflows/supabase-heartbeat.yml`) se zažene dvakrat tedensko (ponedeljek + četrtek) in preveri, da je tabela `reminders` dostopna.
+
+### Namestitev (lokalno z JSON — privzeto)
+
+Brez nastavljenega `PERSISTENCE_DRIVER` aplikacija uporablja lokalno datoteko `data/reminders.json`. Nič se ne spremeni.
+
+### Namestitev (lokalno s Supabase)
+
+```
+PERSISTENCE_DRIVER=supabase
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+```
+
+Dodaj v `.env` in zaženi `npm start`.
+
+### Preklop nazaj na JSON
+
+Odstrani ali nastavi `PERSISTENCE_DRIVER=json`. Podatki v Supabase ostanejo nedotaknjeni.
+
+### Preverjanje delovanja
+
+1. Zaženi app z `PERSISTENCE_DRIVER=supabase`
+2. Ob zagonu konzola prikaže: `[Persistence] Driver: supabase`
+3. Ustvari testni opomnik — preveri, da se pojavi v Supabase SQL Editor: `select * from reminders;`
+4. Redeploy na Render — opomniki morajo ostati
+5. Zaženi GitHub Actions workflow (**Actions → Supabase Heartbeat → Run workflow**) — mora biti zeleno
+
+### Izvoz opomnikov
+
+Obiški `/api/reminders/export` (z veljavnim `X-App-Code` headerjem) — brskalnik prenese `reminders-backup.json`.
+
+### Arhitektura shranjevanja
+
+```
+server.js
+  ↓ require
+src/persistence/remindersStore.js   ← izbere driver glede na PERSISTENCE_DRIVER
+  ├── jsonStore.js                  ← data/reminders.json (privzeto, lokalno)
+  └── supabaseStore.js              ← Supabase PostgreSQL (Render produkcija)
+```
+
+Oba driverja imata enaki metodi: `loadReminders()` in `saveReminders(reminders)`.

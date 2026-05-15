@@ -7,9 +7,11 @@ const fs         = require('fs');
 const path       = require('path');
 const crypto     = require('crypto');
 
-const app       = express();
-const PORT      = process.env.PORT || 3000;
-const DATA_FILE = path.join(__dirname, 'data', 'reminders.json');
+// Persistence layer — driver selected by PERSISTENCE_DRIVER env var ("json" | "supabase")
+const { loadReminders, saveReminders } = require('./src/persistence/remindersStore');
+
+const app  = express();
+const PORT = process.env.PORT || 3000;
 
 const SMTP_HOST   = process.env.SMTP_HOST || 'smtp.gmail.com';
 const SMTP_PORT   = parseInt(process.env.SMTP_PORT || '465', 10);
@@ -94,28 +96,6 @@ function requireAuth(req, res, next) {
 // ── Email validation ──────────────────────────────────────────
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-// ── Data helpers ──────────────────────────────────────────────
-
-function loadReminders() {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      const backup = DATA_FILE + '.backup.' + Date.now();
-      try { fs.copyFileSync(DATA_FILE, backup); } catch (_) {}
-      console.log('Podatki poškodovani, začenjam znova.');
-    }
-    saveReminders([]);
-    return [];
-  }
-}
-
-function saveReminders(reminders) {
-  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-  fs.writeFileSync(DATA_FILE, JSON.stringify(reminders, null, 2));
-}
 
 // ── Email provider ────────────────────────────────────────────
 //
@@ -297,9 +277,16 @@ async function runSmtpDiagnostics() {
 // ── Reminder checker (runs every 60s) ─────────────────────────
 
 async function checkAndSendReminders() {
-  const reminders = loadReminders();
-  const now       = Date.now();
-  const pending   = reminders.filter(r => !r.sent);
+  let reminders;
+  try {
+    reminders = await loadReminders();
+  } catch (err) {
+    console.error('[checkReminders] Napaka nalaganja:', err.message);
+    return;
+  }
+
+  const now     = Date.now();
+  const pending = reminders.filter(r => !r.sent);
 
   console.log(`[${new Date().toLocaleString('sl-SI')}] Strežniški čas. Preverjam ${pending.length} opomnikov.`);
 
@@ -358,11 +345,20 @@ async function checkAndSendReminders() {
     }
   }
 
-  if (changed) saveReminders(reminders);
+  if (changed) {
+    try {
+      await saveReminders(reminders);
+    } catch (err) {
+      console.error('[checkReminders] Napaka shranjevanja:', err.message);
+    }
+  }
 }
 
-checkAndSendReminders();
-setInterval(checkAndSendReminders, 60 * 1000);
+checkAndSendReminders().catch(err => console.error('[checkReminders] Napaka:', err.message));
+setInterval(
+  () => checkAndSendReminders().catch(err => console.error('[checkReminders] Napaka:', err.message)),
+  60 * 1000
+);
 
 // ── API Routes ────────────────────────────────────────────────
 
@@ -421,11 +417,16 @@ app.get('/api/smtp-test', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/reminders', requireAuth, (req, res) => {
-  res.json(loadReminders());
+app.get('/api/reminders', requireAuth, async (req, res) => {
+  try {
+    res.json(await loadReminders());
+  } catch (err) {
+    console.error('Napaka nalaganja:', err.message);
+    res.status(500).json(makeError('ERR-015'));
+  }
 });
 
-app.post('/api/reminders', requireAuth, (req, res) => {
+app.post('/api/reminders', requireAuth, async (req, res) => {
   const { title, description, remindAt, email, followUp } = req.body;
 
   if (!title)    return res.status(400).json(makeError('ERR-007', { message: 'Naslov opomnika je obvezen.' }));
@@ -449,9 +450,9 @@ app.post('/api/reminders', requireAuth, (req, res) => {
   }
 
   try {
-    const reminders = loadReminders();
+    const reminders = await loadReminders();
     reminders.push(reminder);
-    saveReminders(reminders);
+    await saveReminders(reminders);
     res.json(reminder);
   } catch (err) {
     console.error('Napaka shranjevanja:', err.message);
@@ -459,57 +460,63 @@ app.post('/api/reminders', requireAuth, (req, res) => {
   }
 });
 
-app.delete('/api/reminders/:id', requireAuth, (req, res) => {
-  const reminders = loadReminders();
-  const filtered  = reminders.filter(r => r.id !== req.params.id);
+app.delete('/api/reminders/:id', requireAuth, async (req, res) => {
+  try {
+    const reminders = await loadReminders();
+    const filtered  = reminders.filter(r => r.id !== req.params.id);
 
-  if (filtered.length === reminders.length) {
-    return res.status(404).json(makeError('ERR-006'));
+    if (filtered.length === reminders.length) {
+      return res.status(404).json(makeError('ERR-006'));
+    }
+
+    await saveReminders(filtered);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Napaka brisanja:', err.message);
+    res.status(500).json(makeError('ERR-015'));
   }
-
-  saveReminders(filtered);
-  res.json({ ok: true });
 });
 
-app.patch('/api/reminders/:id', requireAuth, (req, res) => {
+app.patch('/api/reminders/:id', requireAuth, async (req, res) => {
   const { title, description, remindAt, email, followUp } = req.body;
-  const reminders = loadReminders();
-  const idx = reminders.findIndex(r => r.id === req.params.id);
-
-  if (idx === -1) return res.status(404).json(makeError('ERR-006'));
-
-  const reminder = reminders[idx];
-
-  if (title !== undefined)       reminder.title       = title;
-  if (description !== undefined) reminder.description = description;
-  if (email !== undefined) {
-    if (!EMAIL_RE.test(email)) return res.status(400).json(makeError('ERR-008', { message: 'Email ni veljaven.' }));
-    reminder.email = email;
-  }
-  if (remindAt !== undefined) {
-    if (isNaN(new Date(remindAt).getTime())) return res.status(400).json(makeError('ERR-009'));
-    reminder.remindAt = remindAt;
-    if (new Date(remindAt).getTime() > Date.now()) {
-      reminder.sent   = false;
-      reminder.sentAt = null;
-      if (reminder.followUp) reminder.followUp.sentAt = null;
-    }
-  }
-
-  if (followUp !== undefined) {
-    if (!followUp || !followUp.enabled || !followUp.delayMinutes) {
-      reminder.followUp = null;
-    } else {
-      reminder.followUp = {
-        enabled:      true,
-        delayMinutes: followUp.delayMinutes,
-        sentAt:       reminder.followUp ? reminder.followUp.sentAt : null,
-      };
-    }
-  }
 
   try {
-    saveReminders(reminders);
+    const reminders = await loadReminders();
+    const idx = reminders.findIndex(r => r.id === req.params.id);
+
+    if (idx === -1) return res.status(404).json(makeError('ERR-006'));
+
+    const reminder = reminders[idx];
+
+    if (title !== undefined)       reminder.title       = title;
+    if (description !== undefined) reminder.description = description;
+    if (email !== undefined) {
+      if (!EMAIL_RE.test(email)) return res.status(400).json(makeError('ERR-008', { message: 'Email ni veljaven.' }));
+      reminder.email = email;
+    }
+    if (remindAt !== undefined) {
+      if (isNaN(new Date(remindAt).getTime())) return res.status(400).json(makeError('ERR-009'));
+      reminder.remindAt = remindAt;
+      if (new Date(remindAt).getTime() > Date.now()) {
+        reminder.sent   = false;
+        reminder.sentAt = null;
+        if (reminder.followUp) reminder.followUp.sentAt = null;
+      }
+    }
+
+    if (followUp !== undefined) {
+      if (!followUp || !followUp.enabled || !followUp.delayMinutes) {
+        reminder.followUp = null;
+      } else {
+        reminder.followUp = {
+          enabled:      true,
+          delayMinutes: followUp.delayMinutes,
+          sentAt:       reminder.followUp ? reminder.followUp.sentAt : null,
+        };
+      }
+    }
+
+    await saveReminders(reminders);
     res.json(reminder);
   } catch (err) {
     console.error('Napaka shranjevanja:', err.message);
@@ -518,9 +525,15 @@ app.patch('/api/reminders/:id', requireAuth, (req, res) => {
 });
 
 app.post('/api/reminders/:id/send-now', requireAuth, async (req, res) => {
-  const reminders = loadReminders();
-  const reminder  = reminders.find(r => r.id === req.params.id);
+  let reminders;
+  try {
+    reminders = await loadReminders();
+  } catch (err) {
+    console.error('Napaka nalaganja:', err.message);
+    return res.status(500).json(makeError('ERR-015'));
+  }
 
+  const reminder = reminders.find(r => r.id === req.params.id);
   if (!reminder) return res.status(404).json(makeError('ERR-006'));
 
   const configErr = checkEmailConfig();
@@ -530,7 +543,7 @@ app.post('/api/reminders/:id/send-now', requireAuth, async (req, res) => {
     await sendReminderEmail(reminder);
     reminder.sent   = true;
     reminder.sentAt = new Date().toISOString();
-    saveReminders(reminders);
+    await saveReminders(reminders);
     res.json({ ok: true, message: 'Email poslan.' });
   } catch (err) {
     console.error('Napaka pošiljanja:', JSON.stringify({
@@ -568,6 +581,19 @@ app.post('/api/test-email', testEmailLimiter, requireAuth, async (req, res) => {
       errMsg:    err.message,
     }));
     res.status(500).json(smtpErrorMessage(err));
+  }
+});
+
+// Protected: export all reminders as a downloadable JSON file
+app.get('/api/reminders/export', requireAuth, async (req, res) => {
+  try {
+    const reminders = await loadReminders();
+    res.setHeader('Content-Disposition', 'attachment; filename="reminders-backup.json"');
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(reminders, null, 2));
+  } catch (err) {
+    console.error('Napaka izvoza:', err.message);
+    res.status(500).json(makeError('ERR-015'));
   }
 });
 
